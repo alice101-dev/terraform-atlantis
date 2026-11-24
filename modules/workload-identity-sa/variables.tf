@@ -65,6 +65,70 @@ variable "project_roles" {
   }
 }
 
+variable "custom_role" {
+  description = "Custom role project opsional untuk SA ini. null = tidak dibuat."
+  type = object({
+    role_id     = string
+    title       = string
+    description = optional(string, "")
+    permissions = list(string)
+  })
+  default = null
+
+  validation {
+    condition     = var.custom_role == null || can(regex("^[a-zA-Z0-9_.]{3,64}$", var.custom_role.role_id))
+    error_message = "custom_role.role_id hanya huruf, angka, '_' dan '.', 3-64 karakter (tanpa '-')."
+  }
+
+  validation {
+    condition     = var.custom_role == null || length(var.custom_role.permissions) > 0
+    error_message = "custom_role.permissions minimal satu permission."
+  }
+
+  # Custom role tidak boleh membuka jalan eskalasi (IAM / setIamPolicy).
+  validation {
+    condition = var.custom_role == null || alltrue([
+      for p in var.custom_role.permissions : !startswith(p, "iam.") && !endswith(p, ".setIamPolicy")
+    ])
+    error_message = "custom_role.permissions tidak boleh berisi iam.* atau *.setIamPolicy."
+  }
+}
+
+variable "conditional_project_roles" {
+  description = "Role project dengan IAM Condition (CEL). Key = nama logis binding."
+  type = map(object({
+    role        = string
+    title       = string
+    description = optional(string, "")
+    expression  = string
+  }))
+  default = {}
+
+  validation {
+    condition = alltrue([
+      for r in values(var.conditional_project_roles) : !contains([
+        "roles/owner",
+        "roles/editor",
+        "roles/resourcemanager.projectIamAdmin",
+        "roles/iam.securityAdmin",
+        "roles/iam.serviceAccountAdmin",
+        "roles/iam.serviceAccountUser",
+        "roles/iam.serviceAccountTokenCreator",
+        "roles/iam.serviceAccountKeyAdmin",
+        "roles/iam.workloadIdentityUser",
+        "roles/iam.roleAdmin",
+        "roles/iam.organizationRoleAdmin",
+      ], r.role)
+    ])
+    error_message = "conditional_project_roles tidak boleh berisi owner/editor atau role IAM admin/impersonasi."
+  }
+
+  validation {
+    condition     = alltrue([for r in values(var.conditional_project_roles) : trimspace(r.expression) != ""])
+    error_message = "conditional_project_roles[*].expression tidak boleh kosong."
+  }
+}
+
 variable "kubernetes_service_accounts" {
   description = "KSA yang boleh memakai SA ini lewat Workload Identity"
   type = list(object({

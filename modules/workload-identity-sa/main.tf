@@ -28,6 +28,42 @@ resource "google_project_iam_member" "roles" {
   member  = google_service_account.this.member
 }
 
+# Custom role opsional untuk permission granular yang tidak ada di role predefined
+# (mis. hanya storage.buckets.create + list).
+resource "google_project_iam_custom_role" "this" {
+  for_each = var.custom_role == null ? {} : { this = var.custom_role }
+
+  project     = var.project_id
+  role_id     = each.value.role_id
+  title       = each.value.title
+  description = each.value.description
+  permissions = each.value.permissions
+}
+
+resource "google_project_iam_member" "custom" {
+  for_each = google_project_iam_custom_role.this
+
+  project = var.project_id
+  role    = each.value.name
+  member  = google_service_account.this.member
+}
+
+# Role project dengan IAM Condition (mis. storage.admin hanya untuk bucket
+# berprefix tertentu).
+resource "google_project_iam_member" "conditional" {
+  for_each = var.conditional_project_roles
+
+  project = var.project_id
+  role    = each.value.role
+  member  = google_service_account.this.member
+
+  condition {
+    title       = each.value.title
+    description = each.value.description
+    expression  = each.value.expression
+  }
+}
+
 # KSA → GSA (Workload Identity). Member format: serviceAccount:<project>.svc.id.goog[<ns>/<ksa>]
 resource "google_service_account_iam_member" "workload_identity" {
   for_each = { for k in var.kubernetes_service_accounts : "${k.namespace}/${k.name}" => k }

@@ -6,7 +6,7 @@
 #
 # Apply order: services (enable cloudkms API + provision service agent) → KMS →
 #              {kubernetes-engine, cloud-sql-postgres-app, artifact-registry,
-#               backup-for-gke, secret-manager, PV Atlantis}.
+#               backup-for-gke, secret-manager, cloud-storage, PV Atlantis}.
 #
 # Konsumen memakai key via data-source by-name (bukan remote_state), mis. GKE:
 #   database_encryption { state = "ENCRYPTED", key_name = <crypto_key gke> }
@@ -15,6 +15,12 @@
 # Nomor project dibutuhkan untuk menyusun email service agent GCP (deterministik).
 data "google_project" "this" {
   project_id = var.project_id
+}
+
+# Service agent Cloud Storage dibuat on-demand; data source ini memanggil API yang
+# sekaligus membuatnya (docs provider: lebih disarankan daripada menyusun email).
+data "google_storage_project_service_account" "gcs" {
+  project = var.project_id
 }
 
 locals {
@@ -37,6 +43,8 @@ locals {
     atlantis = ["serviceAccount:service-${data.google_project.this.number}@compute-system.iam.gserviceaccount.com"]
     # Replika secret (CMEK) — dienkripsi oleh Secret Manager agent
     "secret-manager" = ["serviceAccount:service-${data.google_project.this.number}@gcp-sa-secretmanager.iam.gserviceaccount.com"]
+    # Bucket GCS umum (workspace cloud-storage)
+    storage = [data.google_storage_project_service_account.gcs.member]
   }
 
   # Bangun binding hanya untuk key yang benar-benar dibuat di crypto_keys.

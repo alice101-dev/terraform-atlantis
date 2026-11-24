@@ -20,6 +20,8 @@ module "atlantis_identity" {
   description  = "Terraform plan/apply via Atlantis — role granular, tanpa IAM project/impersonasi"
 
   project_roles               = var.project_roles
+  custom_role                 = var.custom_role
+  conditional_project_roles   = var.conditional_project_roles
   kubernetes_service_accounts = var.kubernetes_service_accounts
   bucket_roles                = var.bucket_roles
 

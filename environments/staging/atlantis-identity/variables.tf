@@ -30,6 +30,28 @@ variable "project_roles" {
   type        = set(string)
 }
 
+variable "custom_role" {
+  description = "Custom role untuk Atlantis (permission granular); mirror tipe modul"
+  type = object({
+    role_id     = string
+    title       = string
+    description = optional(string, "")
+    permissions = list(string)
+  })
+  default = null
+}
+
+variable "conditional_project_roles" {
+  description = "Role project ber-IAM Condition untuk Atlantis; mirror tipe modul"
+  type = map(object({
+    role        = string
+    title       = string
+    description = optional(string, "")
+    expression  = string
+  }))
+  default = {}
+}
+
 variable "kubernetes_service_accounts" {
   description = "KSA Atlantis yang boleh memakai SA ini (Workload Identity)"
   type = list(object({
