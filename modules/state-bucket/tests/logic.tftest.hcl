@@ -21,7 +21,7 @@ run "defaults_enforce_hardening" {
   variables {
     project_id  = "test-project"
     env         = "staging"
-    bucket_name = "staging-hades-terraform-state"
+    bucket_name = "staging-tfstate-jbpbgb"
   }
 
   assert {
@@ -67,7 +67,7 @@ run "deletion_protection_off_maps_to_delete" {
   variables {
     project_id          = "test-project"
     env                 = "staging"
-    bucket_name         = "staging-hades-terraform-state"
+    bucket_name         = "staging-tfstate-jbpbgb"
     deletion_protection = false
   }
 
@@ -84,7 +84,7 @@ run "noncurrent_cleanup_values_propagate" {
   variables {
     project_id  = "test-project"
     env         = "staging"
-    bucket_name = "staging-hades-terraform-state"
+    bucket_name = "staging-tfstate-jbpbgb"
     noncurrent_version_retention = {
       keep_newest  = 5
       min_age_days = 30
@@ -110,7 +110,7 @@ run "soft_delete_below_minimum_rejected" {
   variables {
     project_id                    = "test-project"
     env                           = "staging"
-    bucket_name                   = "staging-hades-terraform-state"
+    bucket_name                   = "staging-tfstate-jbpbgb"
     soft_delete_retention_seconds = 86400
   }
 
@@ -124,7 +124,7 @@ run "soft_delete_above_maximum_rejected" {
   variables {
     project_id                    = "test-project"
     env                           = "staging"
-    bucket_name                   = "staging-hades-terraform-state"
+    bucket_name                   = "staging-tfstate-jbpbgb"
     soft_delete_retention_seconds = 8000000
   }
 
@@ -151,7 +151,7 @@ run "zero_keep_newest_rejected" {
   variables {
     project_id  = "test-project"
     env         = "staging"
-    bucket_name = "staging-hades-terraform-state"
+    bucket_name = "staging-tfstate-jbpbgb"
     noncurrent_version_retention = {
       keep_newest  = 0
       min_age_days = 90

@@ -3,8 +3,10 @@ region = "asia-southeast2"
 env    = "staging"
 
 # --- State Bucket ---
-# Nama final = "${env}-${state_bucket_name}" → staging-hades-terraform-state
-state_bucket_name = "hades-terraform-state"
+# Nama final = "${env}-${state_bucket_name}" → staging-tfstate-jbpbgb.
+# Nama bucket GCS global-unik: suffix acak supaya tidak bentrok dengan bucket
+# di project lain.
+state_bucket_name = "tfstate-jbpbgb"
 
 # Recovery net DR: soft-delete 90 hari (maksimum GCS; default GCP hanya 7 hari)
 soft_delete_retention_seconds = 7776000

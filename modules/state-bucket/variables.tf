@@ -13,7 +13,7 @@ variable "env" {
 }
 
 variable "bucket_name" {
-  description = "Nama bucket state (global-unik, sudah ber-prefix env dari wrapper, contoh: staging-hades-terraform-state)"
+  description = "Nama bucket state (global-unik, sudah ber-prefix env dari wrapper, contoh: staging-tfstate-jbpbgb)"
   type        = string
 
   validation {
