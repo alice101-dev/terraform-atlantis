@@ -187,7 +187,7 @@ Atlantis can change real infrastructure, so it is locked down layer by layer —
 
 ### Edge (Cloudflare, configured manually)
 
-> In production, manage these Cloudflare settings (DNS record, SSL/TLS mode, WAF rule, API token) as code with the `cloudflare/cloudflare` Terraform provider. Here they are set by hand because the zone is shared and not owned by this project.
+> In production, manage these Cloudflare settings (DNS record, SSL/TLS mode, WAF rule, API token) as code with the `cloudflare/cloudflare` Terraform provider. Here they are set by hand.
 
 | Control | Purpose |
 |---|---|
