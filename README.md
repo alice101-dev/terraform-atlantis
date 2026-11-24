@@ -100,6 +100,20 @@ checkov -d . --config-file .checkov.yaml --compact
 
 Collections are maps (`for_each`) — add/remove infra = add/remove a map key in `.tfvars`. No secrets in `.tfvars`; use Secret Manager or IAM auth.
 
+### Repository settings
+
+`main` is protected by `.github/branch-protection.json`: PR required, every CI job must pass (Format, Validate, Unit tests, Checkov, TFLint, Gitleaks) on an up-to-date branch, admins included, no force push or deletion. Apply after editing the file:
+
+```bash
+gh api -X PUT repos/alice101-dev/terraform-atlantis/branches/main/protection --input .github/branch-protection.json
+```
+
+Interaction limits restrict comments and PRs to collaborators; they expire every 6 months, renew with:
+
+```bash
+gh api -X PUT repos/alice101-dev/terraform-atlantis/interaction-limits -f limit=collaborators_only -f expiry=six_months
+```
+
 ## 📖 Cheat sheet
 
 **GKE node pool** — `kubernetes-engine/staging.tfvars`, map `node_pools` (remove = delete the key):
