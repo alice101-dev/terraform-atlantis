@@ -1,6 +1,6 @@
 terraform {
   backend "gcs" {
-    bucket = "staging-hades-terraform-state"
+    bucket = "staging-tfstate-3494211213"
     prefix = "staging/cloud-sql-postgres-app"
   }
 }
