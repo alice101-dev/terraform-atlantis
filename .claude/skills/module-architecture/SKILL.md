@@ -50,11 +50,11 @@ Use a `dynamic` block for optional nested blocks (allow/deny, taints, authorized
 ## Standard resource conventions
 
 - **Labels:** `{ env = var.env, managed_by = "terraform" }` on everything that supports labels.
-- **Deletion protection:** for stateful/networking modules, include the prevent_destroy guard and keep native protection where the resource offers it:
+- **Deletion protection:** for stateful/networking modules, wire `var.deletion_protection` to the native protection (`deletion_protection*` or `deletion_policy = var.deletion_protection ? "PREVENT" : "DELETE"`) and include the guard. Its `prevent_destroy` is **`false` on purpose** (teardown-friendly learning repo) — only `kms` CryptoKey and `state-bucket` use a literal `true`:
   ```hcl
   resource "null_resource" "deletion_protection" {
     count = var.deletion_protection ? 1 : 0
-    lifecycle { prevent_destroy = true }
+    lifecycle { prevent_destroy = false }
   }
   ```
 - **`lifecycle { ignore_changes = [...] }`:** suppress known runtime drift (e.g. GKE `node_version`, `node_count`, autoresized `disk_size`). Add only with a comment explaining why.

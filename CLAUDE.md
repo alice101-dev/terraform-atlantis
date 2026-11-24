@@ -12,7 +12,7 @@ Claude is **plan-only**. Hard limits are enforced in `.claude/settings.json` (de
 - **GCP & Kubernetes are read-only.** Only `list`/`describe`/`get`/`logs`, and only when it helps the current task. For a fix that mutates cloud, write the exact command for the human to run.
 - **No secrets or personal data in Git** (repo is public): no project IDs, user emails, public admin IPs or company domains in `.tf`/`.tfvars`/docs. Secrets and private inputs live in GCP Secret Manager (`google_secret_manager_secret_version_access` data source) or use IAM auth.
 - Never commit `.terraform/`, `*.tfstate*`, `*.tfplan`. Never push to `main` — branch + PR.
-- To destroy a guard-protected resource, point the human to README → *Destroying a guard-protected resource (SOP)*. Flipping `deletion_protection = false` alone always fails on `prevent_destroy`.
+- To destroy a protected resource, point the human to README → *Destroying a guard-protected resource (SOP)*: `deletion_protection = false` → apply → destroy. Only the KMS CryptoKey and the state bucket carry a literal `prevent_destroy = true` (code change needed).
 
 ## Repo facts
 
@@ -46,7 +46,7 @@ CI (`.github/workflows/pr-checks.yml`, `secret-scan.yml`) runs fmt, validate, `t
 1. **Wrapper pattern** — workspace `main.tf` is a thin module call; the env prefix is applied **once** there (`"${var.env}-${var.cluster_name}"`). Logic lives in the module.
 2. **`for_each` over maps, never `count`** for collections. Add/remove infra = add/remove a map key in `.tfvars`.
 3. **Labels** `{ env = var.env, managed_by = "terraform" }` on everything that supports them.
-4. **Deletion protection** — stateful/networking modules keep the `null_resource "deletion_protection"` guard (`prevent_destroy = true`) plus native protection. Don't remove them.
+4. **Deletion protection** — stateful/networking modules expose `deletion_protection` → native protection (`deletion_protection*`, `deletion_policy = PREVENT`) plus the `null_resource "deletion_protection"` guard. The guard's `prevent_destroy` stays **`false` on purpose** (learning repo, easy teardown); literal `true` only on the KMS CryptoKey and the state bucket. Don't remove them or flip them unasked.
 5. **Variables** have `description` + `type`, `optional(...)` defaults, and `validation` for enums/ranges.
 6. Keep existing `lifecycle { ignore_changes = [...] }`; mark endpoints/certs/connection strings `sensitive = true`.
 7. **Comments in `.tf`/`.tftest.hcl` are short Bahasa Indonesia** (technical terms stay English).

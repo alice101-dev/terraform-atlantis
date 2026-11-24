@@ -154,12 +154,11 @@ iam_memberships = {
 
 ## 🗑️ Destroying a guard-protected resource (SOP)
 
-Flipping `deletion_protection = false` **is not enough** — `prevent_destroy` is a literal and still blocks the guard (`Error: Instance cannot be destroyed`). Human / CI only.
+Protection is the **native** setting driven by `deletion_protection` (Cloud SQL `deletion_protection_enabled`, Artifact Registry / service account / address `deletion_policy = PREVENT`, Secret Manager `deletion_protection`, …). The `null_resource "deletion_protection"` guard keeps `prevent_destroy = false` on purpose, so the environment can be torn down without code changes. Human / CI only.
 
 1. Set `deletion_protection = false` in the workspace `.tfvars`.
-2. `terraform state rm '<module>.null_resource.deletion_protection[0]'` — removes the guard marker from state (no cloud resource is lost).
-3. `terraform apply -var-file="<env>.tfvars"` — lowers the native guard (e.g. Cloud SQL `deletion_protection_enabled`, Artifact Registry `deletion_policy`); updated in place, not destroyed.
-4. `terraform plan -destroy -var-file="<env>.tfvars" -out=tfplan-destroy`, review, then `terraform apply tfplan-destroy`.
-5. Restore `deletion_protection = true`.
+2. `terraform apply -var-file="<env>.tfvars"` — lowers the native protection in place (nothing is destroyed yet).
+3. `terraform plan -destroy -var-file="<env>.tfvars" -out=tfplan-destroy`, review, then `terraform apply tfplan-destroy`.
+4. Restore `deletion_protection = true` when the environment is rebuilt.
 
-Exceptions: KMS keys have a literal `prevent_destroy` (`modules/kms/main.tf`) and cannot be deleted in GCP anyway; the state bucket has its own teardown in `bootstrap/staging/README.md`.
+Exceptions (literal `prevent_destroy = true`, needs a code change in a PR): the KMS CryptoKey (`modules/kms/main.tf`; KeyRings/CryptoKeys can't be deleted in GCP anyway, destroy only removes key versions) and the state bucket (teardown in `bootstrap/staging/README.md`).
