@@ -65,7 +65,7 @@ variable "release_channel" {
 }
 
 variable "gateway_api_channel" {
-  description = "Channel Gateway API (CHANNEL_DISABLED, CHANNEL_STANDARD)"
+  description = "Channel Gateway API bawaan GKE (CHANNEL_DISABLED, CHANNEL_STANDARD, CHANNEL_EXPERIMENTAL); divalidasi di modul"
   type        = string
   default     = "CHANNEL_STANDARD"
 }

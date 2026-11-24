@@ -16,11 +16,13 @@ kms_key_ring_name = "hades-keyring"
 
 # --- GKE Cluster ---
 # Identity & Core Settings
-cluster_name        = "hades"
-enable_autopilot    = false # Mode = Standard (kelola node pool manual)
-release_channel     = "STABLE"
-datapath_provider   = "ADVANCED_DATAPATH"
-gateway_api_channel = "CHANNEL_STANDARD"
+cluster_name      = "hades"
+enable_autopilot  = false # Mode = Standard (kelola node pool manual)
+release_channel   = "STABLE"
+datapath_provider = "ADVANCED_DATAPATH"
+# CRD Gateway API dikelola Argo CD (versi yang dibutuhkan kgateway), bukan GKE —
+# supaya CRD tidak punya dua pengelola.
+gateway_api_channel = "CHANNEL_DISABLED"
 # Maintenance window: 01:00–05:00 WIB (Jakarta), Senin–Kamis saja (kecuali Jum/Sab/Min).
 # start_time WAJIB Zulu/UTC. 18:00Z = 01:00 WIB hari berikutnya; durasi 4 jam (modul).
 # BYDAY memakai hari UTC: WIB Sen–Kam @01:00 = UTC Min–Rab @18:00 -> SU,MO,TU,WE.

@@ -106,9 +106,14 @@ variable "enable_inter_node_transparent_encryption" {
 }
 
 variable "gateway_api_channel" {
-  description = "Channel Gateway API (CHANNEL_DISABLED, CHANNEL_STANDARD)"
+  description = "Channel Gateway API bawaan GKE (CHANNEL_DISABLED = CRD Gateway API dikelola sendiri, mis. via Argo CD)"
   type        = string
   default     = "CHANNEL_STANDARD"
+
+  validation {
+    condition     = contains(["CHANNEL_DISABLED", "CHANNEL_STANDARD", "CHANNEL_EXPERIMENTAL"], var.gateway_api_channel)
+    error_message = "gateway_api_channel harus CHANNEL_DISABLED, CHANNEL_STANDARD atau CHANNEL_EXPERIMENTAL."
+  }
 }
 
 variable "enable_image_streaming" {
