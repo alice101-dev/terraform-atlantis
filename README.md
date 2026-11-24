@@ -18,8 +18,10 @@ environments/staging/
 ├── kubernetes-engine/           # GKE cluster (hades) + node pools
 ├── cloud-sql-postgres-app/      # Cloud SQL PostgreSQL
 ├── artifact-registry/
-└── backup-for-gke/              # Full-cluster Backup for GKE
+├── backup-for-gke/              # Full-cluster Backup for GKE
+└── argocd-bootstrap/            # Argo CD + root Application (human-only)
 modules/<name>/                  # reusable modules, each with tests/*.tftest.hcl
+gitops/                          # Argo CD-managed Kubernetes manifests (root.yaml → appsets/)
 ```
 
 Each workspace: `backend.tf`, `provider.tf`, `variables.tf`, `main.tf` (thin wrapper), `outputs.tf`, `.terraform.lock.hcl`, `<env>.tfvars`.
@@ -51,6 +53,7 @@ A workspace only works once its dependencies exist in GCP:
 | `kubernetes-engine` | `vpc`, `kms`, `secret-manager` | Key `gke`, secret `gke-admin-networks` |
 | `cloud-sql-postgres-app` | `vpc`, `kms` | Key `cloud-sql` — **CMEK is create-time only** |
 | `artifact-registry` | `services`, `kms` | Key `artifact-registry` |
+| `argocd-bootstrap` | `kubernetes-engine`, `secret-manager` (`atlantis-hostname` value), `atlantis-identity`, `static-ip` | Human-only; Argo CD UI via `kubectl port-forward` (see `terraform output argocd_ui`) |
 | `backup-for-gke` | `kubernetes-engine`, `kms` | `enable_gke_backup_agent = true`, key `backup-gke` |
 
 ## 🛠 Setup (one-time)
