@@ -2,6 +2,7 @@
   "required_status_checks": {
     "strict": true,
     "checks": [
+      { "context": "Detect Terraform changes", "app_id": 15368 },
       { "context": "Format", "app_id": 15368 },
       { "context": "Validate (all workspaces)", "app_id": 15368 },
       { "context": "Unit tests (terraform test)", "app_id": 15368 },

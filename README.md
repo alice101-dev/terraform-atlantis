@@ -116,7 +116,7 @@ Collections are maps (`for_each`) — add/remove infra = add/remove a map key in
 
 ### Repository settings
 
-`main` is protected by `.github/branch-protection.json`: PR required, every CI job must pass (Format, Validate, Unit tests, Checkov, TFLint, Gitleaks) on an up-to-date branch, admins included, no force push or deletion. Apply after editing the file:
+`main` is protected by `.github/branch-protection.json`: PR required, every CI job must pass (Detect Terraform changes, Format, Validate, Unit tests, Checkov, TFLint, Gitleaks) on an up-to-date branch — Terraform jobs are skipped (reported as success) when a PR touches no Terraform files, admins included, no force push or deletion. Apply after editing the file:
 
 ```bash
 gh api -X PUT repos/alice101-dev/terraform-atlantis/branches/main/protection --input .github/branch-protection.json
