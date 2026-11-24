@@ -38,8 +38,24 @@ test_scoped_firewall_allowed if {
 	count(deny) == 0 with input as {"resource_changes": [rc("google_compute_firewall", ["create"], {"direction": "INGRESS", "source_ranges": ["35.235.240.0/20"]})]}
 }
 
-test_kms_key_iam_allowed if {
-	count(deny) == 0 with input as {"resource_changes": [rc("google_kms_crypto_key_iam_member", ["create"], {})]}
+test_kms_key_iam_denied if {
+	count(deny) == 1 with input as {"resource_changes": [rc("google_kms_crypto_key_iam_member", ["create"], {})]}
+}
+
+test_secret_iam_denied if {
+	count(deny) == 1 with input as {"resource_changes": [rc("google_secret_manager_secret_iam_member", ["create"], {})]}
+}
+
+test_bucket_iam_delete_denied if {
+	count(deny) == 1 with input as {"resource_changes": [rc("google_storage_bucket_iam_member", ["delete"], null)]}
+}
+
+test_service_account_iam_single_deny if {
+	count(deny) == 1 with input as {"resource_changes": [rc("google_service_account_iam_member", ["create"], {})]}
+}
+
+test_noop_resource_iam_allowed if {
+	count(deny) == 0 with input as {"resource_changes": [rc("google_kms_crypto_key_iam_member", ["no-op"], {})]}
 }
 
 upd(type, before, after) := {"address": sprintf("%s.x", [type]), "type": type, "change": {"actions": ["update"], "before": before, "after": after}}

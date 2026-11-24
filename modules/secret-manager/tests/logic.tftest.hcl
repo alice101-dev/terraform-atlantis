@@ -8,7 +8,8 @@
 #   - default version_destroy_ttl 24 jam + passthrough deletion_protection
 #   - flatten iam_members → binding per (secret, role, member)
 #   - default_accessor_members → fan-out secretAccessor ke SEMUA secret + dedupe
-#   - validation: rotation tanpa topics, role non-secretmanager, period < 1 jam,
+#   - validation: rotation tanpa topics, role non-secretmanager, secretmanager.admin,
+#     period < 1 jam,
 #     member tanpa prefix identitas IAM
 # Jalankan: terraform -chdir=modules/secret-manager init -backend=false && terraform -chdir=modules/secret-manager test
 # ---------------------------------------------------------------------------
@@ -232,6 +233,23 @@ run "rejects_non_secretmanager_role" {
     secrets = {
       "bad" = {
         iam_members = [{ member = "user:a@example.com", role = "roles/editor" }]
+      }
+    }
+  }
+
+  expect_failures = [var.secrets]
+}
+
+# --- VALIDATION: roles/secretmanager.admin ditolak (bisa ubah IAM secret) ---
+run "rejects_secretmanager_admin_role" {
+  command = plan
+
+  variables {
+    project_id = "test-project"
+    env        = "staging"
+    secrets = {
+      "bad" = {
+        iam_members = [{ member = "user:a@example.com", role = "roles/secretmanager.admin" }]
       }
     }
   }

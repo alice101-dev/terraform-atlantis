@@ -48,6 +48,17 @@ deny contains msg if {
 	msg := sprintf("%s:\nservice accounts are not managed by Atlantis (human-applied workspace)", [rc.address])
 }
 
+# IAM level resource (secret, bucket, KMS key, dll.) butuh persetujuan policy owner.
+# Project IAM dan service account sudah ditolak rule di atas.
+deny contains msg if {
+	some rc in input.resource_changes
+	regex.match(`_iam_(member|binding|policy)$`, rc.type)
+	not startswith(rc.type, "google_project_iam")
+	not startswith(rc.type, "google_service_account")
+	changes_resource(rc)
+	msg := sprintf("%s:\nresource-level IAM change requires approval from a policy owner (atlantis approve_policies)", [rc.address])
+}
+
 # Firewall terbuka ke internet butuh persetujuan eksplisit.
 deny contains msg if {
 	some rc in input.resource_changes

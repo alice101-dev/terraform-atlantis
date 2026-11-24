@@ -97,9 +97,9 @@ variable "secrets" {
   validation {
     condition = alltrue([
       for s in values(var.secrets) :
-      alltrue([for b in s.iam_members : startswith(b.role, "roles/secretmanager.")])
+      alltrue([for b in s.iam_members : startswith(b.role, "roles/secretmanager.") && b.role != "roles/secretmanager.admin"])
     ])
-    error_message = "iam_members hanya menerima role roles/secretmanager.* (least privilege per-secret; akses baca nilai cukup roles/secretmanager.secretAccessor). Role lain dikelola di workspace iam."
+    error_message = "iam_members hanya menerima role roles/secretmanager.* selain roles/secretmanager.admin (bisa ubah IAM secret); akses baca nilai cukup roles/secretmanager.secretAccessor. Role lain dikelola di workspace iam."
   }
 
   validation {
