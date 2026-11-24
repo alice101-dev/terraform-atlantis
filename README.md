@@ -10,6 +10,7 @@ environments/staging/
 ├── services/                    # GCP API enablement — apply first
 ├── vpc/                         # VPC, subnets, PSA connection
 ├── cloud-nat/  firewall/
+├── static-ip/                   # Regional external IP for the public kgateway LoadBalancer
 ├── service-accounts/  iam/      # SA identities, then role bindings
 ├── atlantis-identity/           # Atlantis GSA: granular roles + Workload Identity (human-only)
 ├── kms/                         # KeyRing + one CMEK key per consumer
@@ -46,6 +47,7 @@ A workspace only works once its dependencies exist in GCP:
 | `atlantis-identity` | `services`, `bootstrap` | Human-only: Atlantis never changes its own permissions |
 | `vpc` | `services` | Network + PSA |
 | `cloud-nat`, `firewall` | `vpc` | |
+| `static-ip` | `services` | Origin IP for the Cloudflare DNS record |
 | `kubernetes-engine` | `vpc`, `kms`, `secret-manager` | Key `gke`, secret `gke-admin-networks` |
 | `cloud-sql-postgres-app` | `vpc`, `kms` | Key `cloud-sql` — **CMEK is create-time only** |
 | `artifact-registry` | `services`, `kms` | Key `artifact-registry` |
