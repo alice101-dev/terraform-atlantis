@@ -80,10 +80,11 @@ All `#` comments in `.tf`/`.tftest.hcl` are short **Bahasa Indonesia**; technica
 
 ## Per-module notes
 
-- **`kms`** — KeyRing + one CryptoKey per consumer (`gke`, `cloud-sql`, `artifact-registry`, `backup-gke`); rotation ≤ 90 days via `validation`. Consumers look keys up by name (`data "google_kms_crypto_key"`), so `kms` applies first. The CryptoKey has a literal `prevent_destroy`; KeyRings/CryptoKeys can't be deleted in GCP.
+- **`kms`** — KeyRing + one CryptoKey per consumer (`gke`, `cloud-sql`, `artifact-registry`, `backup-gke`, `atlantis`, `secret-manager`); rotation ≤ 90 days via `validation`. Consumers look keys up by name (`data "google_kms_crypto_key"`), so `kms` applies first. The CryptoKey has a literal `prevent_destroy`; KeyRings/CryptoKeys can't be deleted in GCP.
 - **`cloud-sql`** — wired as `staging/cloud-sql-postgres-app` (PSC + CMEK). CMEK is **create-time only**: it can't be added to an existing instance.
 - **`backup-for-gke`** — whole-cluster BackupPlan + RestorePlan. Backups/restores are triggered with `gcloud` (the provider has no backup/restore resource); see `environments/staging/backup-for-gke/README.md`.
-- **`secret-manager`** — secret **containers only** (replication, CMEK, IAM limited to `roles/secretmanager.*`, `deletion_protection`, 24h `version_destroy_ttl`). Values are added out-of-band with `gcloud secrets versions add`, never via Terraform. Not wired to a workspace yet.
+- **`secret-manager`** — secret **containers only** (replication, CMEK, IAM limited to `roles/secretmanager.*`, `deletion_protection`, 24h `version_destroy_ttl`). Values are added out-of-band with `gcloud secrets versions add`, never via Terraform. Wired as `staging/secret-manager` (CMEK replica + per-secret IAM to Workload Identity principals).
 - **`privileged-access-manager`** — PAM **entitlements** only (who may request which role, max duration, optional approval; `roles/owner`/`editor` rejected). Grants are requested via Console/gcloud. Not wired to a workspace yet.
+- **`workload-identity-sa`** — one GSA for a GKE workload: project roles (deny-list rejects owner/editor and every IAM-admin/impersonation role), `roles/iam.workloadIdentityUser` per KSA, bucket roles (`roles/storage.admin` rejected). Wired as `staging/atlantis-identity` (human-only).
 - **`state-bucket`** — used only by `bootstrap/`; literal `prevent_destroy` + `force_destroy = false`, stricter than other modules on purpose.
 - **`vpc`** — supports `proxy_only_subnets` (`REGIONAL_MANAGED_PROXY`) for regional Envoy LBs; staging uses none.
