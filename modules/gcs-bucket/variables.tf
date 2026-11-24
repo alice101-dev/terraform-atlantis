@@ -25,6 +25,7 @@ variable "buckets" {
     soft_delete_retention_seconds = optional(number, 604800) # 7 hari
     kms_key_name                  = optional(string)
     labels                        = optional(map(string), {})
+    deletion_protection           = optional(bool) # null = ikut var.deletion_protection
     lifecycle_rules = optional(list(object({
       action                     = string
       storage_class              = optional(string)
@@ -92,7 +93,7 @@ variable "buckets" {
 }
 
 variable "deletion_protection" {
-  description = "true = deletion_policy PREVENT (destroy bucket gagal keras) + guard"
+  description = "Default proteksi semua bucket: true = deletion_policy PREVENT (destroy gagal keras) + guard. Bisa di-override per bucket (buckets[*].deletion_protection)."
   type        = bool
   default     = true
 }

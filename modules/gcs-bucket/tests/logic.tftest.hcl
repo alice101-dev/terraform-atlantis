@@ -82,6 +82,44 @@ run "deletion_protection_off" {
   }
 }
 
+# Override per bucket menang atas default workspace, ke dua arah.
+run "deletion_protection_per_bucket_on" {
+  command = plan
+  variables {
+    deletion_protection = false
+    buckets = {
+      "staging-a" = { deletion_protection = true }
+      "staging-b" = {}
+    }
+  }
+  assert {
+    condition     = google_storage_bucket.this["staging-a"].deletion_policy == "PREVENT" && google_storage_bucket.this["staging-b"].deletion_policy == "DELETE"
+    error_message = "Override true hanya untuk bucket itu; bucket lain ikut default false."
+  }
+  assert {
+    condition     = keys(null_resource.deletion_protection) == ["staging-a"]
+    error_message = "Guard hanya untuk bucket yang dilindungi."
+  }
+}
+
+run "deletion_protection_per_bucket_off" {
+  command = plan
+  variables {
+    buckets = {
+      "staging-a" = { deletion_protection = false }
+      "staging-b" = {}
+    }
+  }
+  assert {
+    condition     = google_storage_bucket.this["staging-a"].deletion_policy == "DELETE" && google_storage_bucket.this["staging-b"].deletion_policy == "PREVENT"
+    error_message = "Override false hanya untuk bucket itu; bucket lain ikut default true."
+  }
+  assert {
+    condition     = keys(null_resource.deletion_protection) == ["staging-b"]
+    error_message = "Guard hanya untuk bucket yang dilindungi."
+  }
+}
+
 run "rejects_public_member" {
   command = plan
   variables {
