@@ -121,3 +121,29 @@ run "rejects_invalid_subnet_scope" {
   }
   expect_failures = [var.source_subnetwork_ip_ranges_to_nat]
 }
+
+# --- Lepas IP dari NAT dulu sebelum IP dihapus (2 tahap) ---
+run "attached_count_limits_nat_ips" {
+  command = plan
+  variables {
+    nat_ip_count          = 2
+    nat_ip_attached_count = 1
+  }
+  assert {
+    condition     = length(google_compute_address.nat_ips) == 2
+    error_message = "IP tetap di-reserve sebanyak nat_ip_count."
+  }
+  assert {
+    condition     = length(google_compute_router_nat.nat.nat_ips) == 1
+    error_message = "NAT hanya boleh memakai nat_ip_attached_count IP pertama."
+  }
+}
+
+run "rejects_attached_count_above_ip_count" {
+  command = plan
+  variables {
+    nat_ip_count          = 1
+    nat_ip_attached_count = 2
+  }
+  expect_failures = [var.nat_ip_attached_count]
+}

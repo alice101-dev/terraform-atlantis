@@ -38,7 +38,13 @@ resource "google_compute_router_nat" "nat" {
 
   # IP allocation
   nat_ip_allocate_option = var.nat_ip_allocate_option
-  nat_ips                = var.nat_ip_allocate_option == "MANUAL_ONLY" ? google_compute_address.nat_ips[*].self_link : null
+  # Hanya N IP pertama yang dipasang (nat_ip_attached_count, default semua).
+  # Mengurangi IP = 2 apply: turunkan nat_ip_attached_count dulu (NAT melepas
+  # IP), baru turunkan nat_ip_count (IP dihapus) — GCP menolak hapus IP yang
+  # masih dipakai NAT.
+  nat_ips = var.nat_ip_allocate_option == "MANUAL_ONLY" ? slice(
+    google_compute_address.nat_ips[*].self_link, 0, coalesce(var.nat_ip_attached_count, var.nat_ip_count)
+  ) : null
 
   # Subnet scope
   source_subnetwork_ip_ranges_to_nat = var.source_subnetwork_ip_ranges_to_nat
