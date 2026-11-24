@@ -30,6 +30,11 @@ environment:
   ATLANTIS_AUTODISCOVER_MODE: disabled
   ATLANTIS_SILENCE_FORK_PR_ERRORS: "true"
   CHECKPOINT_DISABLE: "1" # tanpa panggilan checkpoint-api HashiCorp (egress dibatasi)
+  # Pakai conftest bawaan image (/usr/local/bin). Image mengisi
+  # DEFAULT_CONFTEST_VERSION sehingga Atlantis mengunduh conftest dari GitHub
+  # Releases (CDN-nya diblokir egress); nilai kosong → versi default nil →
+  # fallback ke conftest di PATH (server/core/runtime/policy/conftest_client.go).
+  DEFAULT_CONFTEST_VERSION: ""
 
 # Server-side repo config: workflow & requirement TIDAK bisa di-override dari PR.
 repoConfig: |
@@ -55,8 +60,10 @@ repoConfig: |
           # Plan via run supaya output disensor sebelum diposting ke PR publik:
           # project ID → <project>, nomor project → <number>, baris refresh dibuang.
           # pipefail: exit code terraform tetap jadi exit code step.
+          # Binary terraform tidak ada di image; Atlantis mengunduhnya sebagai
+          # <distribution><versi> (mis. terraform1.17.2) ke folder yang ada di PATH.
           - run:
-              command: 'set -o pipefail; terraform plan -input=false -no-color -var-file=staging.tfvars -out "$PLANFILE" 2>&1 | sed -E -e "s/${TF_VAR_project_id}/<project>/g" -e "s#(projects/|service-)[0-9]{6,}#\1<number>#g" -e "/: (Reading|Read complete after|Refreshing state)/d"'
+              command: 'set -o pipefail; "${ATLANTIS_TERRAFORM_DISTRIBUTION}${ATLANTIS_TERRAFORM_VERSION}" plan -input=false -no-color -var-file=staging.tfvars -out "$PLANFILE" 2>&1 | sed -E -e "s/${TF_VAR_project_id}/<project>/g" -e "s#(projects/|service-)[0-9]{6,}#\1<number>#g" -e "/: (Reading|Read complete after|Refreshing state)/d"'
               output: show
       policy_check:
         steps:
@@ -67,7 +74,7 @@ repoConfig: |
           # Hanya owner yang boleh menjalankan apply.
           - run: 'test "$USER_NAME" = "alice101-dev" || { echo "user $USER_NAME is not allowed to apply"; exit 1; }'
           - run:
-              command: 'set -o pipefail; terraform apply -input=false -no-color "$PLANFILE" 2>&1 | sed -E -e "s/${TF_VAR_project_id}/<project>/g" -e "s#(projects/|service-)[0-9]{6,}#\1<number>#g"'
+              command: 'set -o pipefail; "${ATLANTIS_TERRAFORM_DISTRIBUTION}${ATLANTIS_TERRAFORM_VERSION}" apply -input=false -no-color "$PLANFILE" 2>&1 | sed -E -e "s/${TF_VAR_project_id}/<project>/g" -e "s#(projects/|service-)[0-9]{6,}#\1<number>#g"'
               output: show
 
   policies:
