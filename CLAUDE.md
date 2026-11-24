@@ -24,6 +24,7 @@ Claude is **plan-only**. Hard limits are enforced in `.claude/settings.json` (de
 bootstrap/<env>/                # layer 0: state bucket (self-migrate; see bootstrap/staging/README.md)
 environments/<env>/<service>/   # workspace = thin wrapper around one module
 modules/<name>/                 # reusable modules, each with tests/*.tftest.hcl
+gitops/                         # Argo CD manifests (root.yaml rendered by environments/<env>/argocd-bootstrap)
 ```
 
 Workspaces find each other via **by-name `data` sources**, not `terraform_remote_state` — a dependency must already exist in GCP. Apply order and per-workspace prerequisites: `workspace-management` skill.
