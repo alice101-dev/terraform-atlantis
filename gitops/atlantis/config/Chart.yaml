@@ -1,0 +1,5 @@
+apiVersion: v2
+name: atlantis-config
+description: Pendukung Atlantis — secret dari Secret Manager, StorageClass CMEK, route webhook, network policy, policy conftest
+type: application
+version: 0.1.0

@@ -94,7 +94,8 @@ Personal data and credentials stay out of Git. The `secret-manager` workspace cr
 | `staging-gke-admin-networks` | `kubernetes-engine` | `[{"cidr_block": "203.0.113.10/32", "display_name": "admin"}]` |
 | `staging-atlantis-hostname` | `argocd-bootstrap` | public hostname of Atlantis |
 | `staging-cloudflare-api-token` | cert-manager (KSA `cert-manager/cert-manager-secrets`) | Cloudflare API token: `Zone:DNS:Edit` + `Zone:Zone:Read`, scoped to the one zone |
-| `staging-atlantis-gh-app-id`, `-gh-app-key`, `-gh-webhook-secret`, `-web-password` | Atlantis (KSA `atlantis/atlantis-secrets`) | GitHub App ID, private key (PEM), webhook secret, web UI password |
+| `staging-atlantis-gh-app-id`, `staging-atlantis-gh-app-slug` | `argocd-bootstrap` | GitHub App ID and slug |
+| `staging-atlantis-gh-app-key`, `-gh-webhook-secret`, `-web-password` | Atlantis (KSA `atlantis/atlantis-secrets`) | GitHub App private key (PEM), webhook secret, web UI password |
 
 ```bash
 printf '%s' '{"you@example.com":["engineer"]}' | gcloud secrets versions add staging-iam-memberships --data-file=-
@@ -129,6 +130,35 @@ Interaction limits restrict comments and PRs to collaborators; they expire every
 ```bash
 gh api -X PUT repos/alice101-dev/terraform-atlantis/interaction-limits -f limit=collaborators_only -f expiry=six_months
 ```
+
+## 🤖 Atlantis (plan/apply on PRs)
+
+Atlantis runs in GKE (`gitops/appsets/atlantis.yaml`) and manages only the projects listed in `atlantis.yaml`; `bootstrap`, `iam`, `service-accounts`, `kubernetes-engine`, `atlantis-identity` and `argocd-bootstrap` stay human-applied.
+
+PR flow: open a PR → Atlantis plans the changed projects → conftest guardrails run on the plan → when CI is green and the branch is up to date, comment `atlantis apply -p staging-<service>` → merge.
+
+| Control | Where |
+|---|---|
+| Only PRs authored by `alice101-dev` are planned; only `alice101-dev` can apply | `repoConfig` workflow `guarded` (`PULL_AUTHOR` / `USER_NAME`) |
+| Workflow, requirements and policies can't be changed from a PR | `allowed_overrides: []`, `allow_custom_workflows: false` |
+| Delete/replace of stateful resources, project IAM, service accounts, open firewalls need `atlantis approve_policies` | `gitops/atlantis/config/files/policies/guardrails.rego` |
+| GCP identity has no project-IAM, SA-admin or impersonation roles | `environments/staging/atlantis-identity` |
+| Only `POST /events` is public; UI via `kubectl -n atlantis port-forward svc/atlantis 4141:80` (basic auth) | `HTTPRoute atlantis-webhook` |
+| Egress only to GitHub, HashiCorp, `*.googleapis.com`; ingress only from kgateway | `NetworkPolicy` + `FQDNNetworkPolicy` |
+| Plan files on a CMEK-encrypted disk | `StorageClass atlantis-cmek` |
+
+Policy tests: `docker run --rm -v "$PWD/gitops/atlantis/config:/w:ro" -w /w --entrypoint conftest ghcr.io/runatlantis/atlantis:v0.50.0 verify -p files/policies -p policy-tests`
+
+### One-time setup (human)
+
+1. **GitHub App** (owned by your account, installed only on this repo): permissions Administration (read), Checks (rw), Commit statuses (rw), Contents (rw), Issues (rw), Metadata (read), Pull requests (rw), Webhooks (rw), Members (read), Actions (read). Webhook URL `https://<hostname>/events`, content type `application/json`, a random webhook secret; events Pull request reviews, Pushes, Issue comments, Pull requests.
+2. **Secret values** (README → *Private inputs*): hostname, App ID, App slug, private key, webhook secret, web password, Cloudflare token.
+3. **Cloudflare** (zone owner):
+   - DNS `A` record `<hostname>` → `terraform -chdir=environments/staging/static-ip output addresses`, **proxied**.
+   - SSL/TLS mode **Full (strict)** for the hostname.
+   - WAF custom rule on `http.host eq "<hostname>"`: allow only `POST /events` from the GitHub `hooks` ranges (`gh api meta -q .hooks`), block everything else.
+   - API token for cert-manager: `Zone:DNS:Edit` + `Zone:Zone:Read`, this zone only.
+4. Apply `argocd-bootstrap` (after the workspaces in *Apply order*); Argo CD then deploys everything under `gitops/`.
 
 ## 📖 Cheat sheet
 

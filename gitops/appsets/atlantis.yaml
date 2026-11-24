@@ -1,0 +1,87 @@
+# Atlantis: chart upstream + values di repo ini + chart config lokal (secret,
+# StorageClass CMEK, route webhook, network policy, policy conftest). Punya
+# ApplicationSet sendiri karena butuh nilai per-env dari anotasi cluster
+# (hostname, GSA, project) langsung di values chart upstream.
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: atlantis
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            enable_atlantis: "true"
+          matchExpressions:
+            - key: env
+              operator: Exists
+  template:
+    metadata:
+      name: atlantis
+      labels:
+        layer: apps
+      finalizers:
+        - resources-finalizer.argocd.argoproj.io
+    spec:
+      project: platform
+      sources:
+        - repoURL: https://runatlantis.github.io/helm-charts
+          chart: atlantis
+          targetRevision: 7.4.0
+          helm:
+            releaseName: atlantis
+            valueFiles:
+              - $values/gitops/atlantis/values.yaml
+            valuesObject:
+              atlantisUrl: 'https://{{ index .metadata.annotations "platform/public-hostname" }}'
+              githubApp:
+                id: '{{ index .metadata.annotations "platform/atlantis-gh-app-id" }}'
+                slug: '{{ index .metadata.annotations "platform/atlantis-gh-app-slug" }}'
+              serviceAccount:
+                annotations:
+                  iam.gke.io/gcp-service-account: '{{ index .metadata.annotations "platform/atlantis-gsa" }}'
+              environment:
+                TF_VAR_project_id: '{{ index .metadata.annotations "platform/project-id" }}'
+        - repoURL: https://github.com/alice101-dev/terraform-atlantis.git
+          targetRevision: main
+          ref: values
+        - repoURL: https://github.com/alice101-dev/terraform-atlantis.git
+          targetRevision: main
+          path: gitops/atlantis/config
+          helm:
+            releaseName: atlantis-config
+            valuesObject:
+              platform:
+                env: '{{ index .metadata.labels "env" }}'
+                projectId: '{{ index .metadata.annotations "platform/project-id" }}'
+                region: '{{ index .metadata.annotations "platform/region" }}'
+                clusterName: '{{ index .metadata.annotations "platform/cluster-name" }}'
+                publicHostname: '{{ index .metadata.annotations "platform/public-hostname" }}'
+                atlantisKmsKey: '{{ index .metadata.annotations "platform/atlantis-kms-key" }}'
+      destination:
+        name: "{{ .name }}"
+        namespace: atlantis
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        # PSA restricted (enforce) + label agar Gateway publik menerima HTTPRoute dari sini.
+        managedNamespaceMetadata:
+          labels:
+            pod-security.kubernetes.io/enforce: restricted
+            pod-security.kubernetes.io/warn: restricted
+            pod-security.kubernetes.io/audit: restricted
+            platform/gateway: kgateway-public
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true
+          - SkipDryRunOnMissingResource=true
+        retry:
+          limit: 20
+          backoff:
+            duration: 30s
+            factor: 2
+            maxDuration: 5m

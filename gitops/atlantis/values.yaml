@@ -1,0 +1,142 @@
+# Values chart runatlantis/atlantis 7.4.0. Nilai per-env (atlantisUrl, anotasi
+# GSA, TF_VAR_project_id) diisi ApplicationSet atlantis dari anotasi cluster.
+
+# Image di-pin ke digest index multi-arch v0.50.0 (bukan hanya tag).
+image:
+  repository: ghcr.io/runatlantis/atlantis
+  tag: "v0.50.0@sha256:83570c831dd301871704b02375a20914a2d14cdb3192ea66170877e4aad05832"
+  pullPolicy: IfNotPresent
+
+# Hanya repo ini (bukan wildcard owner).
+orgAllowlist: github.com/alice101-dev/terraform-atlantis
+
+# Mode GitHub App. githubApp.id + slug diisi ApplicationSet (anotasi cluster,
+# dibaca argocd-bootstrap dari Secret Manager). Private key + webhook secret
+# datang dari Secret atlantis-vcs (ExternalSecret), tidak pernah ada di values.
+vcsSecretName: atlantis-vcs
+
+# UI dilindungi basic auth (dan tidak dipublikasikan — route hanya POST /events).
+basicAuthSecretName: atlantis-basic-auth
+
+allowForkPRs: false
+disableApplyAll: true
+hidePrevPlanComments: true
+defaultTFVersion: v1.17.2
+
+environment:
+  ATLANTIS_CHECKOUT_STRATEGY: merge
+  ATLANTIS_DISCARD_APPROVAL_ON_PLAN: "true"
+  ATLANTIS_ENABLE_POLICY_CHECKS: "true"
+  ATLANTIS_AUTODISCOVER_MODE: disabled
+  ATLANTIS_SILENCE_FORK_PR_ERRORS: "true"
+  CHECKPOINT_DISABLE: "1" # tanpa panggilan checkpoint-api HashiCorp (egress dibatasi)
+
+# Server-side repo config: workflow & requirement TIDAK bisa di-override dari PR.
+repoConfig: |
+  repos:
+    - id: github.com/alice101-dev/terraform-atlantis
+      branch: /^main$/
+      apply_requirements: [mergeable, undiverged]
+      import_requirements: [mergeable, undiverged]
+      workflow: guarded
+      allowed_overrides: []
+      allow_custom_workflows: false
+      delete_source_branch_on_merge: true
+      policy_check: true
+
+  workflows:
+    guarded:
+      plan:
+        steps:
+          # Hanya PR milik owner yang di-plan (repo public).
+          - run: 'test "$PULL_AUTHOR" = "alice101-dev" || { echo "PR author $PULL_AUTHOR is not allowed"; exit 1; }'
+          - init:
+              extra_args: ["-input=false"]
+          - plan:
+              extra_args: ["-input=false", "-var-file=staging.tfvars"]
+      policy_check:
+        steps:
+          - show
+          - policy_check
+      apply:
+        steps:
+          # Hanya owner yang boleh menjalankan apply.
+          - run: 'test "$USER_NAME" = "alice101-dev" || { echo "user $USER_NAME is not allowed to apply"; exit 1; }'
+          - apply
+
+  policies:
+    owners:
+      users:
+        - alice101-dev
+    policy_sets:
+      - name: guardrails
+        path: /etc/atlantis/policies/guardrails
+        source: local
+
+# Policy rego dari ConfigMap chart config lokal.
+extraVolumes:
+  - name: policies
+    configMap:
+      name: atlantis-policies
+extraVolumeMounts:
+  - name: policies
+    mountPath: /etc/atlantis/policies/guardrails
+    readOnly: true
+
+service:
+  type: ClusterIP
+
+ingress:
+  enabled: false
+
+test:
+  enabled: false
+
+# PV berisi file plan (bisa memuat nilai sensitif) → StorageClass CMEK.
+volumeClaim:
+  enabled: true
+  dataStorage: 5Gi
+  storageClassName: atlantis-cmek
+
+# Atlantis tidak memakai API Kubernetes → tanpa token KSA terpasang
+# (Workload Identity lewat metadata server, tidak butuh token).
+serviceAccount:
+  create: true
+  name: atlantis
+  mount: false
+
+statefulSet:
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 100
+    fsGroup: 1000
+    fsGroupChangePolicy: OnRootMismatch
+    seccompProfile:
+      type: RuntimeDefault
+
+containerSecurityContext:
+  runAsNonRoot: true
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]
+  seccompProfile:
+    type: RuntimeDefault
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    memory: 2Gi
+
+# Node spot memberi ~30 detik sebelum preemption: tunggu proses terraform
+# selesai selama masih ada waktu.
+terminationGracePeriodSeconds: 25
+lifecycle:
+  preStop:
+    exec:
+      command:
+        - /bin/sh
+        - -c
+        - while pgrep -x "terraform" > /dev/null; do sleep 1; done

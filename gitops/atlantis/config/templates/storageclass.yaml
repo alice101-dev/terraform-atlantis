@@ -1,0 +1,13 @@
+# Disk PV Atlantis dienkripsi CMEK (key <env>-<ring>-atlantis; binding ke
+# Compute Engine service agent ada di workspace Terraform kms).
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: atlantis-cmek
+provisioner: pd.csi.storage.gke.io
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
+reclaimPolicy: Delete
+parameters:
+  type: pd-balanced
+  disk-encryption-kms-key: {{ required "platform.atlantisKmsKey wajib" .Values.platform.atlantisKmsKey }}
