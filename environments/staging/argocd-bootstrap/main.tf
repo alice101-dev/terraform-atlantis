@@ -16,6 +16,13 @@ data "google_secret_manager_secret_version_access" "atlantis_hostname" {
   secret = "${var.env}-atlantis-hostname"
 }
 
+# GitHub App ID + slug (bukan kredensial; private key & webhook secret dibaca
+# pod lewat External Secrets, tidak lewat Terraform).
+data "google_secret_manager_secret_version_access" "atlantis_gh_app" {
+  for_each = toset(["id", "slug"])
+  secret   = "${var.env}-atlantis-gh-app-${each.key}"
+}
+
 module "argocd" {
   source = "../../../modules/argocd-bootstrap"
 
@@ -33,12 +40,14 @@ module "argocd" {
   )
 
   cluster_annotations = {
-    "platform/project-id"       = var.project_id
-    "platform/region"           = var.region
-    "platform/cluster-name"     = data.google_container_cluster.gke.name
-    "platform/public-hostname"  = data.google_secret_manager_secret_version_access.atlantis_hostname.secret_data
-    "platform/gateway-ip-name"  = "${var.env}-gateway"
-    "platform/atlantis-gsa"     = "${var.env}-atlantis@${var.project_id}.iam.gserviceaccount.com"
-    "platform/atlantis-kms-key" = "projects/${var.project_id}/locations/${var.region}/keyRings/${var.env}-${var.kms_key_ring_name}/cryptoKeys/${var.env}-${var.kms_key_ring_name}-atlantis"
+    "platform/project-id"           = var.project_id
+    "platform/region"               = var.region
+    "platform/cluster-name"         = data.google_container_cluster.gke.name
+    "platform/public-hostname"      = data.google_secret_manager_secret_version_access.atlantis_hostname.secret_data
+    "platform/gateway-ip-name"      = "${var.env}-gateway"
+    "platform/atlantis-gsa"         = "${var.env}-atlantis@${var.project_id}.iam.gserviceaccount.com"
+    "platform/atlantis-gh-app-id"   = data.google_secret_manager_secret_version_access.atlantis_gh_app["id"].secret_data
+    "platform/atlantis-gh-app-slug" = data.google_secret_manager_secret_version_access.atlantis_gh_app["slug"].secret_data
+    "platform/atlantis-kms-key"     = "projects/${var.project_id}/locations/${var.region}/keyRings/${var.env}-${var.kms_key_ring_name}/cryptoKeys/${var.env}-${var.kms_key_ring_name}-atlantis"
   }
 }

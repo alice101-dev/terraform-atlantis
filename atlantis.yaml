@@ -1,0 +1,101 @@
+# Project yang dikelola Atlantis (autodiscover dimatikan di server).
+# Workspace human-only SENGAJA tidak ada di sini: bootstrap, iam, service-accounts,
+# kubernetes-engine, atlantis-identity, argocd-bootstrap — Atlantis tidak boleh
+# mengubah IAM project, cluster tempat ia berjalan, atau haknya sendiri.
+# Workflow, requirement dan policy diatur server-side (gitops/atlantis/values.yaml)
+# dan tidak bisa di-override dari file ini.
+version: 3
+automerge: false
+parallel_plan: false
+parallel_apply: false
+projects:
+  - name: staging-services
+    dir: environments/staging/services
+    autoplan:
+      enabled: true
+      when_modified:
+        - "*.tf"
+        - "*.tfvars"
+        - ".terraform.lock.hcl"
+        - "../../../modules/services/*.tf"
+  - name: staging-vpc
+    dir: environments/staging/vpc
+    autoplan:
+      enabled: true
+      when_modified:
+        - "*.tf"
+        - "*.tfvars"
+        - ".terraform.lock.hcl"
+        - "../../../modules/vpc/*.tf"
+  - name: staging-cloud-nat
+    dir: environments/staging/cloud-nat
+    autoplan:
+      enabled: true
+      when_modified:
+        - "*.tf"
+        - "*.tfvars"
+        - ".terraform.lock.hcl"
+        - "../../../modules/cloud-nat/*.tf"
+  - name: staging-firewall
+    dir: environments/staging/firewall
+    autoplan:
+      enabled: true
+      when_modified:
+        - "*.tf"
+        - "*.tfvars"
+        - ".terraform.lock.hcl"
+        - "../../../modules/firewall/*.tf"
+  - name: staging-static-ip
+    dir: environments/staging/static-ip
+    autoplan:
+      enabled: true
+      when_modified:
+        - "*.tf"
+        - "*.tfvars"
+        - ".terraform.lock.hcl"
+        - "../../../modules/static-ip/*.tf"
+  - name: staging-kms
+    dir: environments/staging/kms
+    autoplan:
+      enabled: true
+      when_modified:
+        - "*.tf"
+        - "*.tfvars"
+        - ".terraform.lock.hcl"
+        - "../../../modules/kms/*.tf"
+  - name: staging-secret-manager
+    dir: environments/staging/secret-manager
+    autoplan:
+      enabled: true
+      when_modified:
+        - "*.tf"
+        - "*.tfvars"
+        - ".terraform.lock.hcl"
+        - "../../../modules/secret-manager/*.tf"
+  - name: staging-cloud-sql-postgres-app
+    dir: environments/staging/cloud-sql-postgres-app
+    autoplan:
+      enabled: true
+      when_modified:
+        - "*.tf"
+        - "*.tfvars"
+        - ".terraform.lock.hcl"
+        - "../../../modules/cloud-sql/*.tf"
+  - name: staging-artifact-registry
+    dir: environments/staging/artifact-registry
+    autoplan:
+      enabled: true
+      when_modified:
+        - "*.tf"
+        - "*.tfvars"
+        - ".terraform.lock.hcl"
+        - "../../../modules/artifact-registry/*.tf"
+  - name: staging-backup-for-gke
+    dir: environments/staging/backup-for-gke
+    autoplan:
+      enabled: true
+      when_modified:
+        - "*.tf"
+        - "*.tfvars"
+        - ".terraform.lock.hcl"
+        - "../../../modules/backup-for-gke/*.tf"

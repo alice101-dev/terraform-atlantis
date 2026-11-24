@@ -1,0 +1,63 @@
+# Ingress: hanya proxy kgateway ke port 4141.
+# Egress: DNS + metadata server (Workload Identity); domain publik di
+# FQDNNetworkPolicy di bawah. Kebijakan digabung (union).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: atlantis
+spec:
+  podSelector:
+    matchLabels:
+      app: atlantis
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.gateway.namespace }}
+      ports:
+        - protocol: TCP
+          port: 4141
+  egress:
+    - ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # GKE metadata server (docs GKE "Network policy and Workload Identity Federation").
+    - to:
+        - ipBlock:
+            cidr: 169.254.169.252/32
+      ports:
+        - protocol: TCP
+          port: 988
+        - protocol: TCP
+          port: 987
+    - to:
+        - ipBlock:
+            cidr: 169.254.169.254/32
+      ports:
+        - protocol: TCP
+          port: 80
+        - protocol: TCP
+          port: 8080
+---
+apiVersion: networking.gke.io/v1alpha1
+kind: FQDNNetworkPolicy
+metadata:
+  name: atlantis-egress
+spec:
+  podSelector:
+    matchLabels:
+      app: atlantis
+  egress:
+    - matches:
+        {{- range .Values.egressFqdns.names }}
+        - name: {{ . | quote }}
+        {{- end }}
+        {{- range .Values.egressFqdns.patterns }}
+        - pattern: {{ . | quote }}
+        {{- end }}
+      ports:
+        - protocol: TCP
+          port: 443

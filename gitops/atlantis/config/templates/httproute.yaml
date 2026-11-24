@@ -1,0 +1,22 @@
+# Hanya webhook GitHub (POST /events) yang dipublikasikan. UI, /api dan
+# /github-app/* tidak punya route — akses via kubectl port-forward.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: atlantis-webhook
+spec:
+  parentRefs:
+    - name: {{ .Values.gateway.name }}
+      namespace: {{ .Values.gateway.namespace }}
+      sectionName: {{ .Values.gateway.sectionName }}
+  hostnames:
+    - {{ required "platform.publicHostname wajib" .Values.platform.publicHostname | quote }}
+  rules:
+    - matches:
+        - path:
+            type: Exact
+            value: /events
+          method: POST
+      backendRefs:
+        - name: atlantis
+          port: 80

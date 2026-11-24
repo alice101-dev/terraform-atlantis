@@ -1,0 +1,30 @@
+# Diisi ApplicationSet atlantis dari anotasi cluster (gitops/appsets/atlantis.yaml).
+platform:
+  env: ""
+  projectId: ""
+  region: ""
+  clusterName: ""
+  publicHostname: ""
+  atlantisKmsKey: ""
+
+# KSA SecretStore; principal-nya diberi secretAccessor per secret di workspace
+# Terraform secret-manager (ns/atlantis/sa/atlantis-secrets).
+secretStore:
+  serviceAccount: atlantis-secrets
+
+webUsername: admin
+
+gateway:
+  name: kgateway-public
+  namespace: kgateway-system
+  sectionName: https
+
+# Egress Atlantis — selain ini ditolak (implicit deny FQDNNetworkPolicy).
+egressFqdns:
+  names:
+    - github.com             # clone repo (HTTPS)
+    - api.github.com         # GitHub App API (komentar, status)
+    - registry.terraform.io  # provider registry
+    - releases.hashicorp.com # binary terraform + provider HashiCorp
+  patterns:
+    - "*.googleapis.com"     # GCP API + GCS state
