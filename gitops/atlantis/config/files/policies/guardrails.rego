@@ -78,5 +78,5 @@ deny contains msg if {
 	some rc in input.resource_changes
 	"update" in rc.change.actions
 	protection_lowered(rc.change.before, rc.change.after)
-	msg := sprintf("%s: lowering deletion protection requires approval from a policy owner (atlantis approve_policies)", [rc.address])
+	msg := sprintf("%s: lowering deletion_protection requires approval from a policy owner (atlantis approve_policies)", [rc.address])
 }
