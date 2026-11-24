@@ -1,4 +1,4 @@
-# GCP Infrastructure Provisioning with Terraform
+# Hardened Atlantis on GKE — GitOps Terraform for GCP
 
 Terraform for GCP, planned and applied from pull requests by a **hardened Atlantis** running on GKE: deployed with Argo CD, reachable only through Cloudflare, guarded by policy checks, and running with least-privilege GCP access. See *🔐 Security*.
 
