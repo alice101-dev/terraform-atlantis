@@ -1,10 +1,10 @@
 # Guardrail plan Atlantis (conftest, package main, input = terraform show -json).
-# Gagal = apply diblokir sampai owner menjalankan `atlantis approve_policies`.
+# Gagal = apply diblokir sampai policy owner menjalankan `atlantis approve_policies`.
 package main
 
 import rego.v1
 
-# Resource stateful/networking: delete atau replace wajib disetujui owner.
+# Resource stateful/networking: delete atau replace wajib disetujui policy owner.
 protected_types := {
 	"google_sql_database_instance",
 	"google_sql_database",
@@ -30,7 +30,7 @@ deny contains msg if {
 	some rc in input.resource_changes
 	rc.type in protected_types
 	"delete" in rc.change.actions
-	msg := sprintf("%s: delete/replace of a stateful/networking resource requires owner approval (atlantis approve_policies)", [rc.address])
+	msg := sprintf("%s: delete/replace of a stateful/networking resource requires approval from a policy owner (atlantis approve_policies)", [rc.address])
 }
 
 # IAM level project dan service account dikelola workspace human-only, bukan Atlantis.
@@ -55,10 +55,10 @@ deny contains msg if {
 	changes_resource(rc)
 	rc.change.after.direction == "INGRESS"
 	"0.0.0.0/0" in rc.change.after.source_ranges
-	msg := sprintf("%s: INGRESS firewall from 0.0.0.0/0 requires owner approval (atlantis approve_policies)", [rc.address])
+	msg := sprintf("%s: INGRESS firewall from 0.0.0.0/0 requires approval from a policy owner (atlantis approve_policies)", [rc.address])
 }
 
-# Menurunkan proteksi hapus (true → false / PREVENT → lainnya) butuh persetujuan owner.
+# Menurunkan proteksi hapus (true → false / PREVENT → lainnya) butuh persetujuan policy owner.
 protection_lowered(before, after) if {
 	before.deletion_protection == true
 	after.deletion_protection == false
@@ -78,5 +78,5 @@ deny contains msg if {
 	some rc in input.resource_changes
 	"update" in rc.change.actions
 	protection_lowered(rc.change.before, rc.change.after)
-	msg := sprintf("%s: lowering deletion protection requires owner approval (atlantis approve_policies)", [rc.address])
+	msg := sprintf("%s: lowering deletion protection requires approval from a policy owner (atlantis approve_policies)", [rc.address])
 }

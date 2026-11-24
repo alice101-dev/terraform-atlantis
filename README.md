@@ -163,7 +163,7 @@ Every PR is planned automatically and checked against the `guardrails` policy:
 
 ![Atlantis plan and policy check on a PR](images/atlantis-plan-policy.png)
 
-A plan that deletes a protected resource fails the policy check and blocks the merge until the owner runs `atlantis approve_policies`:
+A plan that deletes a protected resource fails the policy check and blocks the merge until a policy owner runs `atlantis approve_policies`:
 
 ![Policy check failing and blocking the merge](images/atlantis-policy-blocked.png)
 
@@ -229,7 +229,7 @@ Atlantis can change real infrastructure, so it is locked down layer by layer —
 | Only PRs authored by `alice101-dev` are planned; only `alice101-dev` can apply | `repoConfig` workflow `guarded` (`PULL_AUTHOR` / `USER_NAME`) |
 | Apply requires `mergeable` (CI green, branch protection) + `undiverged`; a new plan discards approvals | `repoConfig`, `ATLANTIS_DISCARD_APPROVAL_ON_PLAN` |
 | Workflow, requirements and policies can't be overridden from a PR | `allowed_overrides: []`, `allow_custom_workflows: false` |
-| conftest `guardrails`: delete/replace of stateful resources, lowering deletion protection (`true` → `false`, `PREVENT` → `DELETE`), project IAM, service accounts, `0.0.0.0/0` firewalls need `atlantis approve_policies` (owner only) | `gitops/atlantis/config/files/policies/guardrails.rego` |
+| conftest `guardrails`: delete/replace of stateful resources, lowering deletion protection (`true` → `false`, `PREVENT` → `DELETE`), project IAM, service accounts, `0.0.0.0/0` firewalls need `atlantis approve_policies` from a policy owner | `gitops/atlantis/config/files/policies/guardrails.rego` |
 | Plan/apply output in the public PR has the project ID / number redacted; links point to `localhost` | `repoConfig` (`run` + `sed`), `atlantisUrl` |
 
 ### GCP, secrets, repository
