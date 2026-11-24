@@ -30,6 +30,11 @@ environment:
   ATLANTIS_AUTODISCOVER_MODE: disabled
   ATLANTIS_SILENCE_FORK_PR_ERRORS: "true"
   CHECKPOINT_DISABLE: "1" # tanpa panggilan checkpoint-api HashiCorp (egress dibatasi)
+  # Pakai conftest bawaan image (/usr/local/bin). Image mengisi
+  # DEFAULT_CONFTEST_VERSION sehingga Atlantis mengunduh conftest dari GitHub
+  # Releases (CDN-nya diblokir egress); nilai kosong → versi default nil →
+  # fallback ke conftest di PATH (server/core/runtime/policy/conftest_client.go).
+  DEFAULT_CONFTEST_VERSION: ""
 
 # Server-side repo config: workflow & requirement TIDAK bisa di-override dari PR.
 repoConfig: |
