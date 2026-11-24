@@ -1,11 +1,18 @@
-# Values chart runatlantis/atlantis 7.4.0. Nilai per-env (atlantisUrl, anotasi
-# GSA, TF_VAR_project_id) diisi ApplicationSet atlantis dari anotasi cluster.
+# Values chart runatlantis/atlantis 7.4.0. Nilai per-env (anotasi GSA,
+# TF_VAR_project_id, GitHub App ID/slug) diisi ApplicationSet atlantis dari
+# anotasi cluster.
 
 # Image di-pin ke digest index multi-arch v0.50.0 (bukan hanya tag).
 image:
   repository: ghcr.io/runatlantis/atlantis
   tag: "v0.50.0@sha256:83570c831dd301871704b02375a20914a2d14cdb3192ea66170877e4aad05832"
   pullPolicy: IfNotPresent
+
+# Base URL tautan di komentar & status PR (repo public). Sengaja localhost:
+# hostname publik tidak boleh muncul di PR, dan UI memang hanya diakses via
+# kubectl -n atlantis port-forward svc/atlantis 4141:80. Webhook tidak
+# memakai nilai ini (URL webhook diatur di setting repo GitHub).
+atlantisUrl: http://localhost:4141
 
 # Hanya repo ini (bukan wildcard owner).
 orgAllowlist: github.com/alice101-dev/terraform-atlantis
