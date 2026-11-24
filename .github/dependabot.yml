@@ -1,0 +1,33 @@
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Asia/Jakarta
+    cooldown:
+      default-days: 3
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      github-actions:
+        patterns: ["*"]
+
+  - package-ecosystem: terraform
+    directories:
+      - /bootstrap/*
+      - /environments/*/*
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Asia/Jakarta
+    cooldown:
+      default-days: 3
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      terraform-providers:
+        patterns: ["*"]
