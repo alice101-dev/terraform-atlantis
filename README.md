@@ -1,4 +1,6 @@
-# GCP Infrastructure Provisioning with Terraform
+# Hardened Atlantis on GKE — GitOps Terraform for GCP
+
+Terraform for GCP, planned and applied from pull requests by a **hardened Atlantis** running on GKE: deployed with Argo CD, reachable only through Cloudflare, guarded by policy checks, and running with least-privilege GCP access. See *🔐 Security*.
 
 Small, reusable modules + decoupled per-service workspaces (each with its own state) to keep the blast radius low. Workspaces find each other **by name** (`data` sources), not `terraform_remote_state`.
 
@@ -58,7 +60,7 @@ A workspace only works once its dependencies exist in GCP:
 | `iam` | `service-accounts`, `secret-manager` | SA + secret `iam-memberships` must exist |
 | `kms` | `services` | Before every CMEK consumer |
 | `secret-manager` | `services`, `kms` | Key `secret-manager`; add secret values before `iam` / `kubernetes-engine` |
-| `atlantis-identity` | `services`, `bootstrap` | Human-only: Atlantis never changes its own permissions |
+| `atlantis-identity` | `services`, `bootstrap`, `kubernetes-engine` | Human-only: Atlantis never changes its own permissions. The Workload Identity binding needs the cluster's identity pool |
 | `vpc` | `services` | Network + PSA |
 | `cloud-nat`, `firewall` | `vpc` | |
 | `static-ip` | `services` | Origin IP for the Cloudflare DNS record |
@@ -112,18 +114,20 @@ gcloud secrets versions add staging-atlantis-gh-app-key --data-file=app-private-
 ```bash
 cd environments/staging/<service>
 terraform init && terraform validate
-terraform plan -var-file="staging.tfvars" -out=tfplan   # apply = human / CI only
+terraform plan -var-file="staging.tfvars" -out=tfplan   # local preview only
 
-# Module tests + security scan (also run in CI with fmt, validate, Gitleaks)
+# Module tests + security scan (CI runs these too, plus fmt, TFLint, conftest, Gitleaks)
 terraform -chdir=modules/<name> init -backend=false && terraform -chdir=modules/<name> test
 checkov -d . --config-file .checkov.yaml --compact
 ```
 
 Collections are maps (`for_each`) — add/remove infra = add/remove a map key in `.tfvars`. No secrets in `.tfvars`; use Secret Manager or IAM auth.
 
+Applying: workspaces in `atlantis.yaml` are applied **only through a PR** (see *Atlantis*); `(human)` workspaces are applied from an up-to-date `main` with `terraform apply tfplan`.
+
 ### Repository settings
 
-`main` is protected by `.github/branch-protection.json`: PR required, every CI job must pass (Detect Terraform changes, Format, Validate, Unit tests, Checkov, TFLint, Policy tests, Gitleaks) on an up-to-date branch — Terraform jobs are skipped (reported as success) when a PR touches no Terraform files, admins included, no force push or deletion. Apply after editing the file:
+`main` is protected by `.github/branch-protection.json`: PR required (admins included), branch must be up to date, no force push or deletion, and every CI job must pass — Detect Terraform changes, Format, Validate, Unit tests, Checkov, TFLint, Policy tests, Gitleaks. On a PR that touches no Terraform files the Terraform jobs are skipped, which counts as passing. Apply after editing the file:
 
 ```bash
 gh api -X PUT repos/alice101-dev/terraform-atlantis/branches/main/protection --input .github/branch-protection.json
@@ -139,18 +143,15 @@ gh api -X PUT repos/alice101-dev/terraform-atlantis/interaction-limits -f limit=
 
 Atlantis runs in GKE (`gitops/appsets/atlantis.yaml`) and manages only the projects listed in `atlantis.yaml`; `bootstrap`, `iam`, `service-accounts`, `kubernetes-engine`, `atlantis-identity` and `argocd-bootstrap` stay human-applied.
 
-PR flow: open a PR → Atlantis plans the changed projects → conftest guardrails run on the plan → when CI is green and the branch is up to date, comment `atlantis apply -p staging-<service>` → Atlantis merges the PR automatically (`automerge: true`).
+PR flow:
 
-| Control | Where |
-|---|---|
-| Only PRs authored by `alice101-dev` are planned; only `alice101-dev` can apply | `repoConfig` workflow `guarded` (`PULL_AUTHOR` / `USER_NAME`) |
-| Workflow, requirements and policies can't be changed from a PR | `allowed_overrides: []`, `allow_custom_workflows: false` |
-| Delete/replace of stateful resources, project IAM, service accounts, open firewalls need `atlantis approve_policies` | `gitops/atlantis/config/files/policies/guardrails.rego` |
-| GCP identity has no project-IAM, SA-admin or impersonation roles | `environments/staging/atlantis-identity` |
-| Only `POST /events` is public; UI via `kubectl -n atlantis port-forward svc/atlantis 4141:80` (basic auth) | `HTTPRoute atlantis-webhook` |
-| Egress only to GitHub, HashiCorp, `*.googleapis.com`; ingress only from kgateway | `NetworkPolicy` + `FQDNNetworkPolicy` |
-| Plan/apply output posted to the public PR has the project ID and project number redacted (`<project>`, `<number>`) | `repoConfig` workflow `guarded` (`run` + `sed`) |
-| Plan files on a CMEK-encrypted disk | `StorageClass atlantis-cmek` |
+1. Change a workspace (e.g. add a bucket key in `environments/staging/cloud-storage/staging.tfvars`) and open a PR.
+2. Atlantis plans the changed projects and runs the conftest `guardrails` policy on the plan.
+3. If the policy fails (delete of a stateful resource, project IAM, service account, open firewall), review it and comment `atlantis approve_policies -p staging-<service>`.
+4. When CI is green and the branch is up to date, comment `atlantis apply -p staging-<service>`.
+5. Atlantis merges the PR once every project is applied (`automerge: true`).
+
+Security controls around Atlantis: see *🔐 Security*.
 
 Policy tests run in CI (`Policy tests (conftest)`, same Atlantis image) when policies change; locally: `docker run --rm -v "$PWD/gitops/atlantis/config:/w:ro" -w /w --entrypoint conftest ghcr.io/runatlantis/atlantis:v0.50.0 verify -p files/policies -p policy-tests`
 
@@ -180,6 +181,64 @@ A plan that deletes a protected resource fails the policy check and blocks the m
    - API token for cert-manager: `Zone:DNS:Edit` + `Zone:Zone:Read`, this zone only.
 5. Apply `argocd-bootstrap` (after the workspaces in *Apply order*); Argo CD then deploys everything under `gitops/`.
 
+## 🔐 Security
+
+Atlantis can change real infrastructure, so it is locked down layer by layer — from the internet to Terraform.
+
+### Edge (Cloudflare, configured manually)
+
+| Control | Purpose |
+|---|---|
+| DNS record **proxied** | Origin IP is not exposed |
+| SSL/TLS **Full (strict)** | Cloudflare → origin is HTTPS with a valid certificate |
+| WAF custom rule: allow only `POST /events` from the GitHub `hooks` ranges (`gh api meta -q .hooks`), block everything else | Only GitHub webhooks reach the origin |
+
+### Entry into the cluster
+
+| Control | Where |
+|---|---|
+| L4 regional external LB on a static IP; `loadBalancerSourceRanges` = Cloudflare IPv4 ranges only | `gitops/configs/kgateway/values.yaml`, `templates/gateway.yaml` |
+| Gateway listener **HTTPS 443 only** (no port 80) | `gitops/configs/kgateway/templates/gateway.yaml` |
+| Only namespaces labelled `platform/gateway` may attach routes to the public Gateway | `allowedRoutes` in the Gateway, label set in `gitops/appsets/atlantis.yaml` |
+| Let's Encrypt certificate via cert-manager **DNS-01**; Cloudflare token scoped to `Zone:DNS:Edit` + `Zone:Zone:Read` on one zone, synced from Secret Manager | `gitops/configs/cert-manager` |
+| `HTTPRoute` exposes only `POST /events` (exact path); the UI stays private: `kubectl -n atlantis port-forward svc/atlantis 4141:80` + basic auth | `gitops/atlantis/config/templates/httproute.yaml` |
+
+### Atlantis pod (Kubernetes)
+
+| Control | Where |
+|---|---|
+| Namespace PSA **`restricted`** (enforce, warn, audit); other controllers `baseline` enforced, `restricted` warn/audit | `gitops/appsets/atlantis.yaml`, `gitops/appsets/controllers.yaml` |
+| Non-root (UID 100), read-only root filesystem, no privilege escalation, all capabilities dropped, seccomp `RuntimeDefault` | `gitops/atlantis/values.yaml` (`statefulSet.securityContext`, `containerSecurityContext`) |
+| No Kubernetes API token mounted (`serviceAccount.mount: false`); GCP access via Workload Identity through the metadata server | `gitops/atlantis/values.yaml` |
+| Image pinned by **digest**; memory limit; `Service` is `ClusterIP`, chart Ingress disabled | `gitops/atlantis/values.yaml` |
+| `NetworkPolicy`: ingress only from the kgateway namespace on 4141; egress only DNS + GKE metadata server | `gitops/atlantis/config/templates/networkpolicy.yaml` |
+| `FQDNNetworkPolicy`: HTTPS egress only to `github.com`, `api.github.com`, `registry.terraform.io`, `releases.hashicorp.com`, `*.googleapis.com` | same file |
+| Plan files on a **CMEK-encrypted** persistent disk | `gitops/atlantis/config/templates/storageclass.yaml` |
+| GitHub App key + webhook secret pulled from Secret Manager by External Secrets (namespaced `SecretStore`, dedicated KSA `atlantis-secrets`); UI password generated in-cluster, never stored in Git | `gitops/atlantis/config/templates/external-secrets.yaml` |
+| Spot preemption: `preStop` waits for running `terraform` before shutdown | `gitops/atlantis/values.yaml` |
+
+### Atlantis workflow (server-side)
+
+| Control | Where |
+|---|---|
+| Repo allowlist = this repo only; fork PRs disabled; `apply all` disabled; webhook secret required | `gitops/atlantis/values.yaml` |
+| Only PRs authored by `alice101-dev` are planned; only `alice101-dev` can apply | `repoConfig` workflow `guarded` (`PULL_AUTHOR` / `USER_NAME`) |
+| Apply requires `mergeable` (CI green, branch protection) + `undiverged`; a new plan discards approvals | `repoConfig`, `ATLANTIS_DISCARD_APPROVAL_ON_PLAN` |
+| Workflow, requirements and policies can't be overridden from a PR | `allowed_overrides: []`, `allow_custom_workflows: false` |
+| conftest `guardrails`: delete/replace of stateful resources, project IAM, service accounts, `0.0.0.0/0` firewalls need `atlantis approve_policies` (owner only) | `gitops/atlantis/config/files/policies/guardrails.rego` |
+| Plan/apply output in the public PR has the project ID / number redacted; links point to `localhost` | `repoConfig` (`run` + `sed`), `atlantisUrl` |
+
+### GCP, secrets, repository
+
+| Control | Where |
+|---|---|
+| Atlantis GSA via Workload Identity (no key file); granular predefined roles, no project-IAM, SA-admin or impersonation roles; human-applied only | `environments/staging/atlantis-identity` |
+| Workspaces needing IAM admin (`iam`, `service-accounts`, `kubernetes-engine`, `argocd-bootstrap`, `bootstrap`) stay human-applied | `atlantis.yaml` |
+| Secret Manager with CMEK and per-secret IAM to the consuming KSA only | `environments/staging/secret-manager` |
+| `deletion_protection` → native protection / `deletion_policy = PREVENT` (`true` in production) | each workspace `.tfvars` |
+| Branch protection + required checks; interaction limits (collaborators only); GitHub Actions pinned by commit SHA; Gitleaks, Checkov, TFLint, conftest tests in CI | `.github/` |
+| No project IDs, personal emails, admin IPs or company domain in Git — per-env values come from Secret Manager and cluster-secret annotations | `argocd-bootstrap`, `CLAUDE.md` |
+
 ## 📖 Cheat sheet
 
 **GKE node pool** — `kubernetes-engine/staging.tfvars`, map `node_pools` (remove = delete the key):
@@ -208,6 +267,8 @@ iam_memberships = {
 }
 ```
 
+**Fewer Cloud NAT IPs** — two PRs: first lower `nat_ip_attached_count` (NAT releases the IP), then lower `nat_ip_count` (IP deleted). GCP refuses to delete an IP still used by NAT.
+
 **Second instance (e.g. another GKE cluster)** — copy the workspace folder, give it a unique `backend.tf` `prefix` and unique names/CIDRs in `.tfvars`. Checklist: `workspace-management` skill.
 
 **GKE backup & restore** — Terraform manages BackupPlan/RestorePlan; backups/restores are triggered via `gcloud`. Full procedure: `environments/staging/backup-for-gke/README.md`.
@@ -216,7 +277,7 @@ iam_memberships = {
 
 ## 🗑️ Destroying a guard-protected resource (SOP)
 
-Protection is the **native** setting driven by `deletion_protection` (Cloud SQL `deletion_protection_enabled`, Artifact Registry / service account / address `deletion_policy = PREVENT`, Secret Manager `deletion_protection`, …). The `null_resource "deletion_protection"` guard keeps `prevent_destroy = false` on purpose, so the environment can be torn down without code changes. Human / CI only.
+Protection is the **native** setting driven by `deletion_protection` (Cloud SQL `deletion_protection_enabled`, Artifact Registry / GCS bucket / service account / address `deletion_policy = PREVENT`, Secret Manager `deletion_protection`, …). The `null_resource "deletion_protection"` guard keeps `prevent_destroy = false` on purpose, so the environment can be torn down without code changes. Human / CI only.
 
 1. Set `deletion_protection = false` in the workspace `.tfvars`.
 2. `terraform apply -var-file="<env>.tfvars"` — lowers the native protection in place (nothing is destroyed yet).
