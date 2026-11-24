@@ -8,6 +8,7 @@
       { "context": "Unit tests (terraform test)", "app_id": 15368 },
       { "context": "Security scan (Checkov)", "app_id": 15368 },
       { "context": "Lint (TFLint, all workspaces)", "app_id": 15368 },
+      { "context": "Policy tests (conftest)", "app_id": 15368 },
       { "context": "Secret Scanning (Gitleaks)", "app_id": 15368 }
     ]
   },

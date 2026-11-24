@@ -121,7 +121,7 @@ Collections are maps (`for_each`) — add/remove infra = add/remove a map key in
 
 ### Repository settings
 
-`main` is protected by `.github/branch-protection.json`: PR required, every CI job must pass (Detect Terraform changes, Format, Validate, Unit tests, Checkov, TFLint, Gitleaks) on an up-to-date branch — Terraform jobs are skipped (reported as success) when a PR touches no Terraform files, admins included, no force push or deletion. Apply after editing the file:
+`main` is protected by `.github/branch-protection.json`: PR required, every CI job must pass (Detect Terraform changes, Format, Validate, Unit tests, Checkov, TFLint, Policy tests, Gitleaks) on an up-to-date branch — Terraform jobs are skipped (reported as success) when a PR touches no Terraform files, admins included, no force push or deletion. Apply after editing the file:
 
 ```bash
 gh api -X PUT repos/alice101-dev/terraform-atlantis/branches/main/protection --input .github/branch-protection.json
@@ -137,7 +137,7 @@ gh api -X PUT repos/alice101-dev/terraform-atlantis/interaction-limits -f limit=
 
 Atlantis runs in GKE (`gitops/appsets/atlantis.yaml`) and manages only the projects listed in `atlantis.yaml`; `bootstrap`, `iam`, `service-accounts`, `kubernetes-engine`, `atlantis-identity` and `argocd-bootstrap` stay human-applied.
 
-PR flow: open a PR → Atlantis plans the changed projects → conftest guardrails run on the plan → when CI is green and the branch is up to date, comment `atlantis apply -p staging-<service>` → merge.
+PR flow: open a PR → Atlantis plans the changed projects → conftest guardrails run on the plan → when CI is green and the branch is up to date, comment `atlantis apply -p staging-<service>` → Atlantis merges the PR automatically (`automerge: true`).
 
 | Control | Where |
 |---|---|
@@ -150,7 +150,7 @@ PR flow: open a PR → Atlantis plans the changed projects → conftest guardrai
 | Plan/apply output posted to the public PR has the project ID and project number redacted (`<project>`, `<number>`) | `repoConfig` workflow `guarded` (`run` + `sed`) |
 | Plan files on a CMEK-encrypted disk | `StorageClass atlantis-cmek` |
 
-Policy tests: `docker run --rm -v "$PWD/gitops/atlantis/config:/w:ro" -w /w --entrypoint conftest ghcr.io/runatlantis/atlantis:v0.50.0 verify -p files/policies -p policy-tests`
+Policy tests run in CI (`Policy tests (conftest)`, same Atlantis image) when policies change; locally: `docker run --rm -v "$PWD/gitops/atlantis/config:/w:ro" -w /w --entrypoint conftest ghcr.io/runatlantis/atlantis:v0.50.0 verify -p files/policies -p policy-tests`
 
 ### One-time setup (human)
 
