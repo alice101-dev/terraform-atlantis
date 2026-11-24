@@ -36,9 +36,10 @@ jobs:
     timeout-minutes: 5
     outputs:
       terraform: ${{ steps.diff.outputs.terraform }}
+      policy: ${{ steps.diff.outputs.policy }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0 # base and head commits are both needed for the diff
           persist-credentials: false
@@ -58,6 +59,12 @@ jobs:
             echo "terraform=false" >> "$GITHUB_OUTPUT"
             echo "No Terraform changes — Terraform checks skipped." >> "$GITHUB_STEP_SUMMARY"
           fi
+          policy_pattern='^gitops/atlantis/config/(files/policies|policy-tests)/|^\.github/workflows/pr-checks\.yml$'
+          if printf '%s\n' "$files" | grep -qE "$policy_pattern"; then
+            echo "policy=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "policy=false" >> "$GITHUB_OUTPUT"
+          fi
 
   # === Format: terraform fmt across the whole repo ===
   format:
@@ -68,14 +75,14 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: Resolve pinned Terraform version
         id: tfver
         run: echo "version=$(cat .terraform-version)" >> "$GITHUB_OUTPUT"
       - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v4
+        uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
         with:
           terraform_version: ${{ steps.tfver.outputs.version }}
           terraform_wrapper: false
@@ -91,19 +98,19 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: Resolve pinned Terraform version
         id: tfver
         run: echo "version=$(cat .terraform-version)" >> "$GITHUB_OUTPUT"
       - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v4
+        uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
         with:
           terraform_version: ${{ steps.tfver.outputs.version }}
           terraform_wrapper: false
       - name: Cache provider plugins
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ env.TF_PLUGIN_CACHE_DIR }}
           key: tf-plugins-${{ hashFiles('**/.terraform.lock.hcl') }}
@@ -134,19 +141,19 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: Resolve pinned Terraform version
         id: tfver
         run: echo "version=$(cat .terraform-version)" >> "$GITHUB_OUTPUT"
       - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v4
+        uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
         with:
           terraform_version: ${{ steps.tfver.outputs.version }}
           terraform_wrapper: false
       - name: Cache provider plugins
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ env.TF_PLUGIN_CACHE_DIR }}
           key: tf-plugins-${{ hashFiles('**/.terraform.lock.hcl') }}
@@ -183,11 +190,11 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: Setup Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: "3.12"
       - name: Install Checkov (pinned)
@@ -200,6 +207,30 @@ jobs:
           line="$(grep -aE 'Passed checks:' /tmp/ckv.txt | head -1 | sed -E 's/\x1b\[[0-9;]*m//g; s/^[[:space:]]+//')"
           { echo "### Checkov"; echo; echo "${line:-n/a}"; } >> "$GITHUB_STEP_SUMMARY"
           exit $code
+
+  # === Policy tests: conftest unit tests for the Atlantis plan guardrails ===
+  policy-tests:
+    name: Policy tests (conftest)
+    needs: changes
+    if: needs.changes.outputs.policy == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      # Same image (digest) as the Atlantis server in gitops/atlantis/values.yaml,
+      # so the bundled conftest/OPA versions match production. Keep in sync.
+      ATLANTIS_IMAGE: ghcr.io/runatlantis/atlantis:v0.50.0@sha256:83570c831dd301871704b02375a20914a2d14cdb3192ea66170877e4aad05832
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: conftest verify (policies + policy-tests)
+        run: |
+          docker run --rm --network none \
+            -v "$PWD/gitops/atlantis/config:/w:ro" -w /w \
+            --entrypoint conftest "$ATLANTIS_IMAGE" \
+            verify -p files/policies -p policy-tests --no-color | tee /tmp/conftest.txt
+          { echo "### conftest verify"; echo; tail -1 /tmp/conftest.txt; } >> "$GITHUB_STEP_SUMMARY"
 
   # === Lint: TFLint across all workspaces ===
   lint:
@@ -214,11 +245,11 @@ jobs:
       TFLINT_CONFIG_FILE: ${{ github.workspace }}/.tflint.hcl
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: Setup TFLint
-        uses: terraform-linters/setup-tflint@v6
+        uses: terraform-linters/setup-tflint@6ffdbaa3be476b3431f7275c26966ef32ff60337 # v6.3.2
         with:
           tflint_version: ${{ env.TFLINT_VERSION }}
       - name: Initialize TFLint plugins

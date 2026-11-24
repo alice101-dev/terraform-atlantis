@@ -5,7 +5,9 @@
 # Workflow, requirement dan policy diatur server-side (gitops/atlantis/values.yaml)
 # dan tidak bisa di-override dari file ini.
 version: 3
-automerge: false
+# Setelah semua project di PR berhasil di-apply, Atlantis me-merge PR (main =
+# yang sudah di-apply). Merge tetap tunduk ke branch protection.
+automerge: true
 parallel_plan: false
 parallel_apply: false
 projects:
