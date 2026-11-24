@@ -19,6 +19,10 @@ resource "google_compute_address" "nat_ips" {
 
   lifecycle {
     prevent_destroy = false # hindari IP churn tak sengaja yang memutus koneksi berjalan
+    # Saat IP dikurangi, NAT harus melepas IP dulu sebelum IP dihapus (GCP
+    # menolak hapus IP yang masih dipakai NAT). create_before_destroy membuat
+    # Terraform meng-update NAT sebelum destroy IP.
+    create_before_destroy = true
   }
 }
 
