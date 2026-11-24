@@ -19,4 +19,6 @@ buckets = {
       { action = "Delete", days_since_noncurrent_time = 30, with_state = "ARCHIVED" },
     ]
   }
+
+  "staging-skynet-400946" = {}
 }
