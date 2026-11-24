@@ -121,3 +121,64 @@ run "rejects_long_description" {
   }
   expect_failures = [var.description]
 }
+
+# --- Custom role + conditional role ---
+run "wires_custom_and_conditional_roles" {
+  command = plan
+  variables {
+    custom_role = {
+      role_id     = "test_bucket_creator"
+      title       = "Bucket creator"
+      permissions = ["storage.buckets.create", "storage.buckets.list"]
+    }
+    conditional_project_roles = {
+      "storage-admin-data" = {
+        role       = "roles/storage.admin"
+        title      = "data buckets only"
+        expression = "resource.name.startsWith(\"projects/_/buckets/staging-data-\")"
+      }
+    }
+  }
+  assert {
+    condition     = google_project_iam_custom_role.this["this"].permissions == toset(["storage.buckets.create", "storage.buckets.list"])
+    error_message = "Custom role harus memakai permissions yang diberikan."
+  }
+  assert {
+    condition     = google_project_iam_member.conditional["storage-admin-data"].condition[0].expression == "resource.name.startsWith(\"projects/_/buckets/staging-data-\")"
+    error_message = "Conditional role harus membawa expression CEL."
+  }
+}
+
+run "rejects_custom_role_with_iam_permission" {
+  command = plan
+  variables {
+    custom_role = {
+      role_id     = "bad_role"
+      title       = "bad"
+      permissions = ["resourcemanager.projects.setIamPolicy"]
+    }
+  }
+  expect_failures = [var.custom_role]
+}
+
+run "rejects_custom_role_id_with_dash" {
+  command = plan
+  variables {
+    custom_role = {
+      role_id     = "bad-role"
+      title       = "bad"
+      permissions = ["storage.buckets.list"]
+    }
+  }
+  expect_failures = [var.custom_role]
+}
+
+run "rejects_conditional_owner" {
+  command = plan
+  variables {
+    conditional_project_roles = {
+      "x" = { role = "roles/owner", title = "x", expression = "true" }
+    }
+  }
+  expect_failures = [var.conditional_project_roles]
+}
