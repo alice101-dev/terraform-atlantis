@@ -151,14 +151,15 @@ Policy tests: `docker run --rm -v "$PWD/gitops/atlantis/config:/w:ro" -w /w --en
 
 ### One-time setup (human)
 
-1. **GitHub App** (owned by your account, installed only on this repo): permissions Administration (read), Checks (rw), Commit statuses (rw), Contents (rw), Issues (rw), Metadata (read), Pull requests (rw), Webhooks (rw), Members (read), Actions (read). Webhook URL `https://<hostname>/events`, content type `application/json`, a random webhook secret; events Pull request reviews, Pushes, Issue comments, Pull requests.
+1. **GitHub App** (private, "Only on this account", installed on this repo only): repository permissions Actions (read), Administration (read), Checks (rw), Commit statuses (rw), Contents (rw), Issues (rw), Metadata (read), Pull requests (rw), Webhooks (rw). App-level webhook **off** — for a manually created App the Atlantis docs say not to set webhook details on the App. Generate a private key and keep it outside the repo until it is stored in Secret Manager.
 2. **Secret values** (README → *Private inputs*): hostname, App ID, App slug, private key, webhook secret, web password, Cloudflare token.
-3. **Cloudflare** (zone owner):
+3. **Repository webhook** (repo → Settings → Webhooks): payload URL `https://<hostname>/events`, content type `application/json`, secret = the value in `staging-atlantis-gh-webhook-secret`, events Pull request reviews, Pushes, Issue comments, Pull requests.
+4. **Cloudflare** (zone owner):
    - DNS `A` record `<hostname>` → `terraform -chdir=environments/staging/static-ip output addresses`, **proxied**.
    - SSL/TLS mode **Full (strict)** for the hostname.
    - WAF custom rule on `http.host eq "<hostname>"`: allow only `POST /events` from the GitHub `hooks` ranges (`gh api meta -q .hooks`), block everything else.
    - API token for cert-manager: `Zone:DNS:Edit` + `Zone:Zone:Read`, this zone only.
-4. Apply `argocd-bootstrap` (after the workspaces in *Apply order*); Argo CD then deploys everything under `gitops/`.
+5. Apply `argocd-bootstrap` (after the workspaces in *Apply order*); Argo CD then deploys everything under `gitops/`.
 
 ## 📖 Cheat sheet
 
