@@ -142,6 +142,7 @@ PR flow: open a PR → Atlantis plans the changed projects → conftest guardrai
 | GCP identity has no project-IAM, SA-admin or impersonation roles | `environments/staging/atlantis-identity` |
 | Only `POST /events` is public; UI via `kubectl -n atlantis port-forward svc/atlantis 4141:80` (basic auth) | `HTTPRoute atlantis-webhook` |
 | Egress only to GitHub, HashiCorp, `*.googleapis.com`; ingress only from kgateway | `NetworkPolicy` + `FQDNNetworkPolicy` |
+| Plan/apply output posted to the public PR has the project ID and project number redacted (`<project>`, `<number>`) | `repoConfig` workflow `guarded` (`run` + `sed`) |
 | Plan files on a CMEK-encrypted disk | `StorageClass atlantis-cmek` |
 
 Policy tests: `docker run --rm -v "$PWD/gitops/atlantis/config:/w:ro" -w /w --entrypoint conftest ghcr.io/runatlantis/atlantis:v0.50.0 verify -p files/policies -p policy-tests`
