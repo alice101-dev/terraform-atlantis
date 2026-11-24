@@ -163,9 +163,11 @@ Every PR is planned automatically and checked against the `guardrails` policy:
 
 ![Atlantis plan and policy check on a PR](images/atlantis-plan-policy.png)
 
-A plan that deletes a protected resource fails the policy check and blocks the merge until a policy owner runs `atlantis approve_policies`:
+A plan that deletes a protected resource or lowers `deletion_protection` fails the policy check, and `atlantis apply` is refused until a policy owner runs `atlantis approve_policies`:
 
-![Policy check failing and blocking the merge](images/atlantis-policy-blocked.png)
+![Policy check failing on lowered deletion_protection](images/atlantis-policy-failed.png)
+
+![atlantis/policy_check status failing on the PR](images/atlantis-policy-check-status.png)
 
 `atlantis apply` applies the reviewed plan, and Atlantis merges the PR once every project is applied:
 
