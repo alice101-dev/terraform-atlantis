@@ -11,6 +11,7 @@ environments/staging/
 ├── vpc/                         # VPC, subnets, PSA connection
 ├── cloud-nat/  firewall/
 ├── service-accounts/  iam/      # SA identities, then role bindings
+├── atlantis-identity/           # Atlantis GSA: granular roles + Workload Identity (human-only)
 ├── kms/                         # KeyRing + one CMEK key per consumer
 ├── secret-manager/              # Secret containers (values added out-of-band) + per-secret IAM
 ├── kubernetes-engine/           # GKE cluster (hades) + node pools
@@ -42,6 +43,7 @@ A workspace only works once its dependencies exist in GCP:
 | `iam` | `service-accounts`, `secret-manager` | SA + secret `iam-memberships` must exist |
 | `kms` | `services` | Before every CMEK consumer |
 | `secret-manager` | `services`, `kms` | Key `secret-manager`; add secret values before `iam` / `kubernetes-engine` |
+| `atlantis-identity` | `services`, `bootstrap` | Human-only: Atlantis never changes its own permissions |
 | `vpc` | `services` | Network + PSA |
 | `cloud-nat`, `firewall` | `vpc` | |
 | `kubernetes-engine` | `vpc`, `kms`, `secret-manager` | Key `gke`, secret `gke-admin-networks` |
