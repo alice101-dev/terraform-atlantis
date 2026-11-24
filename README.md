@@ -5,28 +5,33 @@ Small, reusable modules + decoupled per-service workspaces (each with its own st
 ## 📂 Layout
 
 ```text
-bootstrap/staging/               # Layer 0 — GCS state bucket (see bootstrap/staging/README.md)
-environments/staging/
-├── services/                    # GCP API enablement — apply first
-├── vpc/                         # VPC, subnets, PSA connection
-├── cloud-nat/  firewall/
-├── static-ip/                   # Regional external IP for the public kgateway LoadBalancer
-├── service-accounts/  iam/      # SA identities, then role bindings
-├── atlantis-identity/           # Atlantis GSA: granular roles + Workload Identity (human-only)
-├── kms/                         # KeyRing + one CMEK key per consumer
-├── secret-manager/              # Secret containers (values added out-of-band) + per-secret IAM
-├── kubernetes-engine/           # GKE cluster (hades) + node pools
-├── cloud-sql-postgres-app/      # Cloud SQL PostgreSQL
-├── artifact-registry/
-├── backup-for-gke/              # Full-cluster Backup for GKE
-└── argocd-bootstrap/            # Argo CD + root Application (human-only)
-modules/<name>/                  # reusable modules, each with tests/*.tftest.hcl
+bootstrap/staging/             # Layer 0: GCS state bucket (human)
+environments/staging/          # in apply order
+├── services/                  # GCP APIs + service agents
+├── kms/                       # KeyRing + one CMEK key per consumer
+├── secret-manager/            # Secret containers + per-secret IAM
+├── service-accounts/          # Service account identities (human)
+├── iam/                       # Project role bindings (human)
+├── vpc/                       # VPC + subnets
+├── cloud-nat/                 # Cloud Router + Cloud NAT
+├── firewall/                  # Firewall rules
+├── static-ip/                 # Public IP for the kgateway LoadBalancer
+├── kubernetes-engine/         # GKE cluster + node pools (human)
+├── atlantis-identity/         # Atlantis GSA + Workload Identity (human)
+├── argocd-bootstrap/          # Argo CD + root Application (human)
+├── artifact-registry/         # Docker repositories
+├── cloud-sql-postgres-app/    # Cloud SQL PostgreSQL
+└── backup-for-gke/            # Backup for GKE plan
+modules/<name>/                # Reusable modules, each with tests/
 gitops/
-├── root.yaml                    # root Application (rendered by argocd-bootstrap)
-├── appsets/                     # AppProject, Gateway API CRDs, ApplicationSets
-├── controllers/<name>/          # upstream Helm chart: config.yaml (chart, version, namespace) + values.yaml
-└── configs/<name>/              # local Helm chart: config.yaml (requires, namespace) + templates
+├── root.yaml                  # Root Application
+├── appsets/                   # AppProject, Gateway API CRDs, ApplicationSets
+├── controllers/<name>/        # Upstream Helm chart: config.yaml + values.yaml
+├── configs/<name>/            # Local Helm chart: config.yaml + templates
+└── atlantis/                  # Atlantis values + config chart (secrets, route, policies)
 ```
+
+`(human)` = applied by a human; every other workspace is applied through Atlantis (`atlantis.yaml`).
 
 A component runs only on clusters labelled `enable_<name>=true` (`enabled_components` in `argocd-bootstrap`). Config charts receive per-env values that stay out of Git — hostname, project, cluster, IP name — as `.Values.platform.*`, read from the in-cluster cluster secret annotations `platform/*`.
 
