@@ -22,20 +22,4 @@ firewall_rules = {
       ports    = ["22"]
     }]
   }
-
-  "allow-http-https" = {
-    description   = "Allow inbound HTTP/HTTPS for web-server tagged instances"
-    direction     = "INGRESS"
-    priority      = 1000
-    source_ranges = ["0.0.0.0/0"]
-    target_tags   = ["web-server"]
-    disabled      = false
-    log_config = {
-      metadata = "EXCLUDE_ALL_METADATA" # reduce log volume for high-traffic rule
-    }
-    allow = [{
-      protocol = "tcp"
-      ports    = ["80", "443"]
-    }]
-  }
 }
