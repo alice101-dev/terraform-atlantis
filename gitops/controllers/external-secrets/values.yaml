@@ -1,0 +1,20 @@
+installCRDs: true
+
+replicaCount: 1
+concurrent: 1
+
+resources:
+  requests: { cpu: 10m, memory: 48Mi }
+  limits: { memory: 192Mi }
+
+webhook:
+  replicaCount: 1
+  resources:
+    requests: { cpu: 10m, memory: 32Mi }
+    limits: { memory: 128Mi }
+
+certController:
+  replicaCount: 1
+  resources:
+    requests: { cpu: 10m, memory: 48Mi }
+    limits: { memory: 192Mi }

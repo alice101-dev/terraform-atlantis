@@ -19,6 +19,12 @@ secrets = {
   "gke-admin-networks" = {} # kubernetes-engine: JSON list {cidr_block, display_name}
   "atlantis-hostname"  = {} # argocd-bootstrap: hostname publik Atlantis (domain tidak di Git)
 
+  # Token Cloudflare (Zone:DNS:Edit + Zone:Zone:Read, satu zone) untuk DNS-01
+  # cert-manager — hanya KSA cert-manager/cert-manager-secrets.
+  "cloudflare-api-token" = {
+    workload_identity = [{ namespace = "cert-manager", service_account = "cert-manager-secrets" }]
+  }
+
   # Kredensial Atlantis — hanya KSA atlantis/atlantis-secrets (SecretStore namespace
   # atlantis) yang boleh membaca.
   "atlantis-gh-app-id" = {

@@ -21,8 +21,14 @@ environments/staging/
 ├── backup-for-gke/              # Full-cluster Backup for GKE
 └── argocd-bootstrap/            # Argo CD + root Application (human-only)
 modules/<name>/                  # reusable modules, each with tests/*.tftest.hcl
-gitops/                          # Argo CD-managed Kubernetes manifests (root.yaml → appsets/)
+gitops/
+├── root.yaml                    # root Application (rendered by argocd-bootstrap)
+├── appsets/                     # AppProject, Gateway API CRDs, ApplicationSets
+├── controllers/<name>/          # upstream Helm chart: config.yaml (chart, version, namespace) + values.yaml
+└── configs/<name>/              # local Helm chart: config.yaml (requires, namespace) + templates
 ```
+
+A component runs only on clusters labelled `enable_<name>=true` (`enabled_components` in `argocd-bootstrap`). Config charts receive per-env values that stay out of Git — hostname, project, cluster, IP name — as `.Values.platform.*`, read from the in-cluster cluster secret annotations `platform/*`.
 
 Each workspace: `backend.tf`, `provider.tf`, `variables.tf`, `main.tf` (thin wrapper), `outputs.tf`, `.terraform.lock.hcl`, `<env>.tfvars`.
 
@@ -87,6 +93,7 @@ Personal data and credentials stay out of Git. The `secret-manager` workspace cr
 | `staging-iam-memberships` | `iam` | `{"you@example.com": ["engineer"]}` |
 | `staging-gke-admin-networks` | `kubernetes-engine` | `[{"cidr_block": "203.0.113.10/32", "display_name": "admin"}]` |
 | `staging-atlantis-hostname` | `argocd-bootstrap` | public hostname of Atlantis |
+| `staging-cloudflare-api-token` | cert-manager (KSA `cert-manager/cert-manager-secrets`) | Cloudflare API token: `Zone:DNS:Edit` + `Zone:Zone:Read`, scoped to the one zone |
 | `staging-atlantis-gh-app-id`, `-gh-app-key`, `-gh-webhook-secret`, `-web-password` | Atlantis (KSA `atlantis/atlantis-secrets`) | GitHub App ID, private key (PEM), webhook secret, web UI password |
 
 ```bash
