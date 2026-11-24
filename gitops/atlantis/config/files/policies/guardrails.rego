@@ -57,3 +57,26 @@ deny contains msg if {
 	"0.0.0.0/0" in rc.change.after.source_ranges
 	msg := sprintf("%s: firewall INGRESS dari 0.0.0.0/0 butuh approve_policies dari owner", [rc.address])
 }
+
+# Menurunkan proteksi hapus (true → false / PREVENT → lainnya) butuh persetujuan owner.
+protection_lowered(before, after) if {
+	before.deletion_protection == true
+	after.deletion_protection == false
+}
+
+protection_lowered(before, after) if {
+	before.deletion_policy == "PREVENT"
+	after.deletion_policy != "PREVENT"
+}
+
+protection_lowered(before, after) if {
+	before.settings[0].deletion_protection_enabled == true
+	after.settings[0].deletion_protection_enabled == false
+}
+
+deny contains msg if {
+	some rc in input.resource_changes
+	"update" in rc.change.actions
+	protection_lowered(rc.change.before, rc.change.after)
+	msg := sprintf("%s: menurunkan deletion protection butuh approve_policies dari owner", [rc.address])
+}

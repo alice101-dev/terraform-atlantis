@@ -41,3 +41,29 @@ test_scoped_firewall_allowed if {
 test_kms_key_iam_allowed if {
 	count(deny) == 0 with input as {"resource_changes": [rc("google_kms_crypto_key_iam_member", ["create"], {})]}
 }
+
+upd(type, before, after) := {"address": sprintf("%s.x", [type]), "type": type, "change": {"actions": ["update"], "before": before, "after": after}}
+
+test_deletion_protection_lowered_denied if {
+	count(deny) == 1 with input as {"resource_changes": [upd("google_secret_manager_secret", {"deletion_protection": true}, {"deletion_protection": false})]}
+}
+
+test_deletion_policy_lowered_denied if {
+	count(deny) == 1 with input as {"resource_changes": [upd("google_storage_bucket", {"deletion_policy": "PREVENT"}, {"deletion_policy": "DELETE"})]}
+}
+
+test_sql_protection_enabled_lowered_denied if {
+	count(deny) == 1 with input as {"resource_changes": [upd("google_sql_database_instance", {"settings": [{"deletion_protection_enabled": true}]}, {"settings": [{"deletion_protection_enabled": false}]})]}
+}
+
+test_deletion_protection_raised_allowed if {
+	count(deny) == 0 with input as {"resource_changes": [upd("google_storage_bucket", {"deletion_policy": "DELETE"}, {"deletion_policy": "PREVENT"})]}
+}
+
+test_deletion_protection_unchanged_allowed if {
+	count(deny) == 0 with input as {"resource_changes": [upd("google_secret_manager_secret", {"deletion_protection": true}, {"deletion_protection": true})]}
+}
+
+test_new_resource_unprotected_allowed if {
+	count(deny) == 0 with input as {"resource_changes": [rc("google_storage_bucket", ["create"], {"deletion_policy": "DELETE"})]}
+}
