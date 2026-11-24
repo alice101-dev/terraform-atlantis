@@ -154,6 +154,20 @@ PR flow: open a PR → Atlantis plans the changed projects → conftest guardrai
 
 Policy tests run in CI (`Policy tests (conftest)`, same Atlantis image) when policies change; locally: `docker run --rm -v "$PWD/gitops/atlantis/config:/w:ro" -w /w --entrypoint conftest ghcr.io/runatlantis/atlantis:v0.50.0 verify -p files/policies -p policy-tests`
 
+### Atlantis in action
+
+Every PR is planned automatically and checked against the `guardrails` policy:
+
+![Atlantis plan and policy check on a PR](images/atlantis-plan-policy.png)
+
+A plan that deletes a protected resource fails the policy check and blocks the merge until the owner runs `atlantis approve_policies`:
+
+![Policy check failing and blocking the merge](images/atlantis-policy-blocked.png)
+
+`atlantis apply` applies the reviewed plan, and Atlantis merges the PR once every project is applied:
+
+![Atlantis apply followed by automatic merge](images/atlantis-apply-automerge.png)
+
 ### One-time setup (human)
 
 1. **GitHub App** (private, "Only on this account", installed on this repo only): repository permissions Actions (read), Administration (read), Checks (rw), Commit statuses (rw), Contents (rw), Issues (rw), Metadata (read), Pull requests (rw), Webhooks (rw). App-level webhook **off** — for a manually created App the Atlantis docs say not to set webhook details on the App. Generate a private key and keep it outside the repo until it is stored in Secret Manager.
