@@ -20,5 +20,5 @@ buckets = {
     ]
   }
 
-  "staging-skynet-400946" = {}
+  "staging-skynet-400946" = { deletion_protection = true }
 }

@@ -42,6 +42,7 @@ variable "buckets" {
     soft_delete_retention_seconds = optional(number, 604800)
     kms_key_name                  = optional(string)
     labels                        = optional(map(string), {})
+    deletion_protection           = optional(bool) # null = ikut var.deletion_protection
     lifecycle_rules = optional(list(object({
       action                     = string
       storage_class              = optional(string)
