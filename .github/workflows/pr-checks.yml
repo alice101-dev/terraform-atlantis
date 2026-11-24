@@ -3,28 +3,13 @@ name: Terraform · PR Checks (offline)
 # Static & logic gates that run WITHOUT GCP credentials (everything offline /
 # mock). Stateful plan/apply with credentials is not here.
 #
-# Minutes-frugal (Free private = 2,000 min/month): matrices are collapsed into a
-# single looping job (1 runner, not 1 per workspace) + provider plugin cache +
-# a paths filter (a PR that doesn't touch Terraform doesn't trigger a run at all).
-#
-# ⚠️ REQUIRED-CHECKS CAVEAT: because of the `paths:` filter below, a PR that touches
-# no Terraform files will NOT run this workflow. If these jobs are ever marked
-# "required" in branch protection, such a PR would be blocked forever (the required
-# check never reports). This repo is GitHub Free + private, where branch protection
-# is unavailable anyway — but if you upgrade, either don't mark these required, or
-# add a tiny companion workflow with the SAME job names on the inverse path set that
-# reports success.
+# Runs on EVERY PR (no `paths:` filter): these jobs are required status checks in
+# branch protection, and a path-filtered required check never reports on a PR that
+# doesn't match — that PR would be blocked forever. Matrices stay collapsed into a
+# single looping job (1 runner, not 1 per workspace) + provider plugin cache.
 on:
   pull_request:
     branches: [main]
-    paths:
-      - "**.tf"
-      - "**.tfvars"
-      - "**.tftest.hcl"
-      - ".terraform-version"
-      - ".tflint.hcl"
-      - ".checkov.yaml"
-      - ".github/workflows/pr-checks.yml"
 
 # Read-only repo access; no GCP secrets in this lane.
 permissions:
