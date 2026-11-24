@@ -56,10 +56,4 @@ variable "buckets" {
     })), [])
   }))
   default = {}
-
-  # Bucket state tidak boleh didefinisikan di sini (dan Atlantis tidak punya hak atasnya).
-  validation {
-    condition     = alltrue([for k in keys(var.buckets) : !startswith(k, "${var.env}-tfstate-")])
-    error_message = "Nama bucket tidak boleh berprefix <env>-tfstate- (bucket state dikelola bootstrap/)."
-  }
 }

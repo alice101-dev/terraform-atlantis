@@ -64,7 +64,7 @@ A workspace only works once its dependencies exist in GCP:
 | `static-ip` | `services` | Origin IP for the Cloudflare DNS record |
 | `kubernetes-engine` | `vpc`, `kms`, `secret-manager` | Key `gke`, secret `gke-admin-networks` |
 | `cloud-sql-postgres-app` | `vpc`, `kms` | Key `cloud-sql` — **CMEK is create-time only** |
-| `cloud-storage` | `kms`, `atlantis-identity` | Key `storage`; full bucket names in tfvars. Atlantis' `storage.admin` excludes the state bucket (`<env>-tfstate-*`) via IAM Condition |
+| `cloud-storage` | `kms`, `atlantis-identity` | Key `storage`; full bucket names in tfvars |
 | `artifact-registry` | `services`, `kms` | Key `artifact-registry` |
 | `argocd-bootstrap` | `kubernetes-engine`, `secret-manager` (`atlantis-hostname` value), `atlantis-identity`, `static-ip` | Human-only; Argo CD UI via `kubectl port-forward` (see `terraform output argocd_ui`) |
 | `backup-for-gke` | `kubernetes-engine`, `kms` | `enable_gke_backup_agent = true`, key `backup-gke` |

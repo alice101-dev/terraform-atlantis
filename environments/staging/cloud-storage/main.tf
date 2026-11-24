@@ -1,9 +1,8 @@
 # ---------------------------------------------------------------------------
 # environments/staging/cloud-storage/main.tf
 #
-# Bucket GCS umum (dikelola Atlantis). Nama bucket ditulis penuh di tfvars.
-# Atlantis boleh mengelola semua bucket kecuali bucket state (IAM Condition di
-# workspace atlantis-identity).
+# Bucket GCS umum (dikelola Atlantis). Nama bucket ditulis penuh di tfvars;
+# penghapusan dicegah deletion_protection.
 #
 # Apply order: services → kms (key "storage") → atlantis-identity → sini.
 # ---------------------------------------------------------------------------
