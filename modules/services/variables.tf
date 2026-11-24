@@ -13,3 +13,14 @@ variable "disable_on_destroy" {
   type        = bool
   default     = false
 }
+
+variable "service_identities" {
+  description = "API yang service agent-nya dibuat (mis. sqladmin.googleapis.com). Harus juga ada di enabled_apis."
+  type        = set(string)
+  default     = []
+
+  validation {
+    condition     = alltrue([for s in var.service_identities : contains(var.enabled_apis, s)])
+    error_message = "Setiap service_identities harus juga ada di enabled_apis (API harus aktif sebelum service agent dibuat)."
+  }
+}

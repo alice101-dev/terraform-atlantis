@@ -45,3 +45,13 @@ enabled_apis = [
 # TIDAK mematikan API yang masih dipakai prod (compute, container, dll).
 # Jangan ubah ke `true` selama project ini masih berisi infra produksi.
 disable_on_destroy = false
+
+# Service agent yang dibutuhkan IAM binding CMEK di workspace kms. Agent Compute
+# Engine (compute-system) dibuat otomatis saat compute API aktif.
+service_identities = [
+  "sqladmin.googleapis.com",         # key cloud-sql
+  "artifactregistry.googleapis.com", # key artifact-registry
+  "gkebackup.googleapis.com",        # key backup-gke
+  "container.googleapis.com",        # key gke (secrets etcd)
+  "secretmanager.googleapis.com",    # key secret-manager
+]
