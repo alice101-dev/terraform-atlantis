@@ -33,10 +33,9 @@ variable "deletion_protection" {
 }
 
 # --- Buckets ---
-# Key = nama dasar TANPA prefix (main.tf → "<env>-data-<key>"). Nama bucket GCS
-# global-unik: beri suffix angka acak.
+# Key = nama bucket penuh (global-unik: beri suffix angka acak).
 variable "buckets" {
-  description = "Map bucket, keyed by nama dasar (tanpa prefix <env>-data-). Mirror tipe modul gcs-bucket."
+  description = "Map bucket, keyed by nama bucket penuh. Mirror tipe modul gcs-bucket."
   type = map(object({
     location                      = optional(string)
     storage_class                 = optional(string, "STANDARD")

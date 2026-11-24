@@ -12,8 +12,8 @@ kms_key_ring_name = "hades-keyring"
 
 # --- Buckets ---
 buckets = {
-  # → staging-data-general-665682: bucket serbaguna (export, artefak kecil).
-  "general-665682" = {
+  # Bucket serbaguna (export, artefak kecil).
+  "staging-data-general-665682" = {
     lifecycle_rules = [
       # Versi lama dihapus 30 hari setelah tidak lagi menjadi versi terbaru.
       { action = "Delete", days_since_noncurrent_time = 30, with_state = "ARCHIVED" },

@@ -24,27 +24,9 @@ project_roles = [
   "roles/gkebackup.admin",                 # backup-for-gke
   "roles/container.clusterViewer",         # backup-for-gke (data source cluster)
   "roles/secretmanager.admin",             # secret-manager (container + IAM per secret)
+  "roles/storage.admin",                   # cloud-storage (bucket umum; dilindungi deletion_protection)
   "roles/browser",                         # data google_project (nomor project)
 ]
-
-# Bucket GCS umum (workspace cloud-storage): Atlantis boleh MEMBUAT bucket apa
-# pun, tapi hanya boleh MENGELOLA/MENGHAPUS bucket berprefix staging-data-.
-# Bucket state (staging-tfstate-*) tidak cocok prefix → tidak tersentuh.
-custom_role = {
-  role_id     = "stagingAtlantisBucketCreator"
-  title       = "Atlantis bucket creator (staging)"
-  description = "Membuat dan me-list bucket; pengelolaan lewat storage.admin ber-condition"
-  permissions = ["storage.buckets.create", "storage.buckets.list"]
-}
-
-conditional_project_roles = {
-  "storage-admin-data-buckets" = {
-    role        = "roles/storage.admin"
-    title       = "staging-data buckets only"
-    description = "storage.admin hanya untuk bucket berprefix staging-data-"
-    expression  = "resource.name.startsWith(\"projects/_/buckets/staging-data-\")"
-  }
-}
 
 kubernetes_service_accounts = [
   { namespace = "atlantis", name = "atlantis" },
