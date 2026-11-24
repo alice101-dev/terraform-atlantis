@@ -1,0 +1,178 @@
+# ============================================================
+# Terraform .gitignore
+# For use with: GitHub Actions CI/CD + Atlantis
+# ============================================================
+
+# -----------------------------
+# Terraform Core Files
+# -----------------------------
+
+# Local .terraform directories (plugin cache, modules, etc.)
+**/.terraform/*
+
+# Modules don't deploy anything — they inherit providers from the calling workspace
+modules/**/.terraform.lock.hcl
+
+# Terraform plan output files (may contain secrets)
+*.tfplan
+*.tfplan.json
+tfplan
+tfplan-destroy
+
+# Crash log files
+crash.log
+crash.*.log
+
+# Terraform variable files — intentionally TRACKED in Git.
+# Infra config only (regions, instance types, counts, etc.)
+# Secrets are managed via GCP Secret Manager, not tfvars.
+# Only ignore personal local override files:
+local.tfvars
+local.tfvars.json
+*.local.tfvars
+
+# Override files (used for local dev overrides, not for CI)
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Terraform CLI configuration file
+.terraformrc
+terraform.rc
+
+# Terraform state files — NEVER commit state to Git
+# Use remote backend (S3, GCS, Terraform Cloud, etc.)
+*.tfstate
+*.tfstate.*
+*.tfstate.backup
+
+# -----------------------------
+# Atlantis-Specific
+# -----------------------------
+
+# Atlantis plan files (Atlantis manages these internally)
+*.atlantis.yaml.bak
+
+# Atlantis temporary working directories
+.atlantis/
+
+# -----------------------------
+# GitHub Actions
+# -----------------------------
+
+# Local act runner artifacts (for local GHA testing with `act`)
+.act/
+
+# -----------------------------
+# Secrets & Credentials
+# -----------------------------
+
+# Common secrets files — never commit these
+*.pem
+*.key
+*.p12
+*.pfx
+*.cer
+*.crt
+secrets.yaml
+secrets.yml
+secrets.json
+.secrets
+.env
+.env.*
+!.env.example
+
+# AWS credentials
+.aws/credentials
+.aws/config
+
+# GCP credentials
+gcp-credentials.json
+*-credentials.json
+application_default_credentials.json
+
+# Azure credentials
+.azure/
+
+# Vault token file
+.vault-token
+
+# SSH keys
+id_rsa
+id_rsa.pub
+id_ed25519
+id_ed25519.pub
+
+# -----------------------------
+# OS & Editor Artifacts
+# -----------------------------
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Linux
+*~
+
+# VS Code (ignore everything except the shared MCP server config)
+.vscode/*
+!.vscode/mcp.json
+*.code-workspace
+
+# JetBrains IDEs
+.idea/
+*.iml
+
+# Vim/Neovim
+*.swp
+*.swo
+[._]*.s[a-v][a-z]
+[._]*.sw[a-p]
+
+# Emacs
+\#*\#
+.\#*
+
+# -----------------------------
+# Terragrunt (if used)
+# -----------------------------
+.terragrunt-cache/
+# Terragrunt-generated debug output (not infra config, safe to ignore)
+terragrunt-debug.tfvars.json
+
+# -----------------------------
+# Testing Tools
+# -----------------------------
+
+# Terratest
+*.test
+vendor/
+
+# Checkov / tfsec / tflint cache
+.checkov/
+.tfsec/
+.tflint.d/
+
+# -----------------------------
+# Logs & Temp Files
+# -----------------------------
+
+*.log
+*.tmp
+*.temp
+*.bak
+*.orig
+.cache/
+tmp/
+
+# -----------------------------
+# Documentation Build Output
+# -----------------------------
+docs/_build/

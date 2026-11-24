@@ -1,0 +1,147 @@
+# GCP Infrastructure Provisioning with Terraform
+
+Small, reusable modules + decoupled per-service workspaces (each with its own state) to keep the blast radius low. Workspaces find each other **by name** (`data` sources), not `terraform_remote_state`.
+
+## 📂 Layout
+
+```text
+bootstrap/staging/               # Layer 0 — GCS state bucket (see bootstrap/staging/README.md)
+environments/staging/
+├── services/                    # GCP API enablement — apply first
+├── vpc/                         # VPC, subnets, PSA connection
+├── cloud-nat/  firewall/
+├── service-accounts/  iam/      # SA identities, then role bindings
+├── kms/                         # KeyRing + one CMEK key per consumer
+├── kubernetes-engine/           # GKE cluster (hades) + node pools
+├── cloud-sql-postgres-app/      # Cloud SQL PostgreSQL
+├── artifact-registry/
+└── backup-for-gke/              # Full-cluster Backup for GKE
+modules/<name>/                  # reusable modules, each with tests/*.tftest.hcl
+```
+
+Each workspace: `backend.tf`, `provider.tf`, `variables.tf`, `main.tf` (thin wrapper), `outputs.tf`, `.terraform.lock.hcl`, `<env>.tfvars`.
+
+| | |
+|---|---|
+| **Region / Zone** | `asia-southeast2` / `asia-southeast2-a` |
+| **Terraform** | `~> 1.17.0` (`.terraform-version` = `1.17.2`, via `tfenv`) |
+| **Provider** | `hashicorp/google ~> 8.12.0` |
+| **Project** | one GCP project per env — `TF_VAR_project_id` (never committed) |
+| **State** | GCS bucket from `bootstrap/<env>/`, `prefix = "<env>/<service>"` |
+| **Environments** | `staging` only; prod = clone of staging (`workspace-management` skill) |
+
+## 🔗 Apply order
+
+A workspace only works once its dependencies exist in GCP:
+
+| Workspace | Depends on | Note |
+|---|---|---|
+| `services` | — | Apply first |
+| `service-accounts` | `services` | Before `iam` |
+| `iam` | `service-accounts` | SA must exist |
+| `kms` | `services` | Before every CMEK consumer |
+| `vpc` | `services` | Network + PSA |
+| `cloud-nat`, `firewall` | `vpc` | |
+| `kubernetes-engine` | `vpc`, `kms` | Key `gke` |
+| `cloud-sql-postgres-app` | `vpc`, `kms` | Key `cloud-sql` — **CMEK is create-time only** |
+| `artifact-registry` | `services`, `kms` | Key `artifact-registry` |
+| `backup-for-gke` | `kubernetes-engine`, `kms` | `enable_gke_backup_agent = true`, key `backup-gke` |
+
+## 🛠 Setup (one-time)
+
+```bash
+# Terraform via tfenv (reads .terraform-version)
+brew install tfenv && tfenv install && tfenv use
+
+# Checkov — same version as CI
+brew install pipx && pipx ensurepath && pipx install checkov==3.3.7
+
+# GCP auth + project (the project ID is never committed — Terraform reads TF_VAR_project_id)
+gcloud auth login && gcloud auth application-default login
+gcloud config set project <your-gcp-project-id>
+export TF_VAR_project_id="$(gcloud config get-value project)"
+
+# KMS service agents must exist before the kms workspace applies
+for s in sqladmin artifactregistry gkebackup container; do
+  gcloud beta services identity create --service=$s.googleapis.com --project="$(gcloud config get-value project)"
+done
+```
+
+State bucket: create it with `bootstrap/<env>/` — steps in `bootstrap/staging/README.md`.
+
+### Private inputs (Secret Manager)
+
+Personal data stays out of Git. Create these once per env (after `services` enabled the Secret Manager API):
+
+| Secret | Read by | Value (JSON) |
+|---|---|---|
+| `staging-iam-memberships` | `iam` | `{"you@example.com": ["engineer"]}` |
+| `staging-gke-admin-networks` | `kubernetes-engine` | `[{"cidr_block": "203.0.113.10/32", "display_name": "admin"}]` |
+
+```bash
+for s in staging-iam-memberships staging-gke-admin-networks; do
+  gcloud secrets create "$s" --replication-policy=user-managed --locations=asia-southeast2
+done
+printf '%s' '{"you@example.com":["engineer"]}' | gcloud secrets versions add staging-iam-memberships --data-file=-
+printf '%s' '[{"cidr_block":"203.0.113.10/32","display_name":"admin"}]' | gcloud secrets versions add staging-gke-admin-networks --data-file=-
+```
+
+## 💻 Daily workflow
+
+```bash
+cd environments/staging/<service>
+terraform init && terraform validate
+terraform plan -var-file="staging.tfvars" -out=tfplan   # apply = human / CI only
+
+# Module tests + security scan (also run in CI with fmt, validate, Gitleaks)
+terraform -chdir=modules/<name> init -backend=false && terraform -chdir=modules/<name> test
+checkov -d . --config-file .checkov.yaml --compact
+```
+
+Collections are maps (`for_each`) — add/remove infra = add/remove a map key in `.tfvars`. No secrets in `.tfvars`; use Secret Manager or IAM auth.
+
+## 📖 Cheat sheet
+
+**GKE node pool** — `kubernetes-engine/staging.tfvars`, map `node_pools` (remove = delete the key):
+
+```hcl
+node_pools = {
+  "my-new-pool" = {
+    machine_type   = "e2-standard-2"
+    min_node_count = 1
+    max_node_count = 3
+    spot           = true
+    image_type     = "COS_CONTAINERD"
+    disk_size_gb   = 50
+    disk_type      = "pd-balanced"
+    labels         = { "env-pool" = "my-new-nodepool" }
+  }
+}
+```
+
+**IAM** — `iam/staging.tfvars`, map `iam_memberships` (user → personas; `sa:<name>` expands to `serviceAccount:<name>@<project>.iam.gserviceaccount.com`):
+
+```hcl
+iam_memberships = {
+  "joe@example.com"      = ["engineer", "dba"]
+  "sa:my-golang-backend" = ["backend_app"]
+}
+```
+
+**Second instance (e.g. another GKE cluster)** — copy the workspace folder, give it a unique `backend.tf` `prefix` and unique names/CIDRs in `.tfvars`. Checklist: `workspace-management` skill.
+
+**GKE backup & restore** — Terraform manages BackupPlan/RestorePlan; backups/restores are triggered via `gcloud`. Full procedure: `environments/staging/backup-for-gke/README.md`.
+
+**Upgrade provider / CLI** — bump `provider.tf` (and `.terraform-version` + `required_version` for the CLI), then per workspace `terraform init -backend=false -upgrade`, commit `provider.tf` + `.terraform.lock.hcl`, roll out staging-first.
+
+## 🗑️ Destroying a guard-protected resource (SOP)
+
+Flipping `deletion_protection = false` **is not enough** — `prevent_destroy` is a literal and still blocks the guard (`Error: Instance cannot be destroyed`). Human / CI only.
+
+1. Set `deletion_protection = false` in the workspace `.tfvars`.
+2. `terraform state rm '<module>.null_resource.deletion_protection[0]'` — removes the guard marker from state (no cloud resource is lost).
+3. `terraform apply -var-file="<env>.tfvars"` — lowers the native guard (e.g. Cloud SQL `deletion_protection_enabled`, Artifact Registry `deletion_policy`); updated in place, not destroyed.
+4. `terraform plan -destroy -var-file="<env>.tfvars" -out=tfplan-destroy`, review, then `terraform apply tfplan-destroy`.
+5. Restore `deletion_protection = true`.
+
+Exceptions: KMS keys have a literal `prevent_destroy` (`modules/kms/main.tf`) and cannot be deleted in GCP anyway; the state bucket has its own teardown in `bootstrap/staging/README.md`.

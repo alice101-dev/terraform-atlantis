@@ -1,0 +1,65 @@
+# CLAUDE.md
+
+GCP infrastructure in Terraform: small reusable modules + decoupled per-service workspaces to keep blast radius low. This is a learning repo — work autonomously on files; never touch real cloud state.
+
+## Safety
+
+Claude is **plan-only**. Hard limits are enforced in `.claude/settings.json` (deny rules); don't work around them.
+
+- **Edit files freely.** `.tf`, `.tfvars`, docs and skills are reversible (git + PR + CI). Only `backend.tf`, `bootstrap/`, `.claude/settings.json`, `.mcp.json`, `.checkov.yaml`, `.github/workflows/` prompt for approval.
+- **Never** `terraform apply`/`destroy`/`import`/`taint`, any `state` mutation, `init -migrate-state`, `force-unlock`, `workspace new/select/delete`, or `plan -destroy` — in any form (`-chdir`, wrappers, scripts). Real applies run via CI/CD or a human.
+- **Safe:** `init`, `validate`, `fmt`, `plan -var-file="<env>.tfvars"`, `providers`, `output` (no `-json`/`-raw`), `terraform test` (only `command = plan` + `mock_provider`), `checkov`.
+- **GCP & Kubernetes are read-only.** Only `list`/`describe`/`get`/`logs`, and only when it helps the current task. For a fix that mutates cloud, write the exact command for the human to run.
+- **No secrets or personal data in Git** (repo is public): no project IDs, user emails, public admin IPs or company domains in `.tf`/`.tfvars`/docs. Secrets and private inputs live in GCP Secret Manager (`google_secret_manager_secret_version_access` data source) or use IAM auth.
+- Never commit `.terraform/`, `*.tfstate*`, `*.tfplan`. Never push to `main` — branch + PR.
+- To destroy a guard-protected resource, point the human to README → *Destroying a guard-protected resource (SOP)*. Flipping `deletion_protection = false` alone always fails on `prevent_destroy`.
+
+## Repo facts
+
+- **Terraform** `~> 1.17.0` (`.terraform-version` = `1.17.2`, via `tfenv`); **provider** `hashicorp/google ~> 8.12.0`.
+- **Region** `asia-southeast2`, **zone** `asia-southeast2-a`. Each env is its own GCP project (`TF_VAR_project_id` — **never commit a project ID**) with its own GCS state bucket (`backend.tf`, `prefix = "<env>/<service>"`).
+- Only `staging` exists; `prod` = clone of staging when needed.
+
+```
+bootstrap/<env>/                # layer 0: state bucket (self-migrate; see bootstrap/staging/README.md)
+environments/<env>/<service>/   # workspace = thin wrapper around one module
+modules/<name>/                 # reusable modules, each with tests/*.tftest.hcl
+```
+
+Workspaces find each other via **by-name `data` sources**, not `terraform_remote_state` — a dependency must already exist in GCP. Apply order and per-workspace prerequisites: `workspace-management` skill.
+
+## Workflow
+
+```bash
+cd environments/<env>/<service>
+terraform init && terraform validate
+terraform plan -var-file="<env>.tfvars"
+
+terraform -chdir=modules/<name> init -backend=false && terraform -chdir=modules/<name> test
+checkov -d . --config-file .checkov.yaml --compact     # CI pins checkov==3.3.7
+```
+
+CI (`.github/workflows/pr-checks.yml`, `secret-scan.yml`) runs fmt, validate, `terraform test`, Checkov and Gitleaks on every PR. There is no plan/apply bot yet.
+
+## Conventions
+
+1. **Wrapper pattern** — workspace `main.tf` is a thin module call; the env prefix is applied **once** there (`"${var.env}-${var.cluster_name}"`). Logic lives in the module.
+2. **`for_each` over maps, never `count`** for collections. Add/remove infra = add/remove a map key in `.tfvars`.
+3. **Labels** `{ env = var.env, managed_by = "terraform" }` on everything that supports them.
+4. **Deletion protection** — stateful/networking modules keep the `null_resource "deletion_protection"` guard (`prevent_destroy = true`) plus native protection. Don't remove them.
+5. **Variables** have `description` + `type`, `optional(...)` defaults, and `validation` for enums/ranges.
+6. Keep existing `lifecycle { ignore_changes = [...] }`; mark endpoints/certs/connection strings `sensitive = true`.
+7. **Comments in `.tf`/`.tftest.hcl` are short Bahasa Indonesia** (technical terms stay English).
+8. **Checkov must pass.** Harden the config instead of suppressing; skip only false-positives inline per-resource (`# checkov:skip=CKV_xxx: <why>`), never repo-wide. What Checkov can't resolve (tfvars-driven firewall/IAM) → `validation` + `terraform test`.
+9. **Module logic change ⇒ update its test** (`run`/`assert`; each `validation`/`precondition` gets an `expect_failures` run).
+
+## Verify schemas with the Terraform MCP — don't guess
+
+Before writing any resource, data source or argument, confirm it against `hashicorp/google ~> 8.12.0` with the `terraform` MCP (`.mcp.json`, runs in Docker). Also check enum values against existing `validation` blocks and read the target module's `variables.tf`/`outputs.tf` instead of inventing inputs.
+
+If the MCP is unavailable, **stop and ask the user** to start Docker and reconnect (`/mcp`). Don't substitute web docs, GitHub source or memory — they drift from the pinned schema. Never claim `validate`/`plan` passed without running it.
+
+## Skills
+
+- `module-architecture` — authoring/editing `modules/` (layout, naming, per-module gotchas).
+- `workspace-management` — workspaces, backends, apply order, cloning.

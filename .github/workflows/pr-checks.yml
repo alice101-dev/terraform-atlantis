@@ -1,0 +1,325 @@
+name: Terraform · PR Checks (offline)
+
+# Static & logic gates that run WITHOUT GCP credentials (everything offline /
+# mock). Stateful plan/apply with credentials is not here.
+#
+# Minutes-frugal (Free private = 2,000 min/month): matrices are collapsed into a
+# single looping job (1 runner, not 1 per workspace) + provider plugin cache +
+# a paths filter (a PR that doesn't touch Terraform doesn't trigger a run at all).
+#
+# ⚠️ REQUIRED-CHECKS CAVEAT: because of the `paths:` filter below, a PR that touches
+# no Terraform files will NOT run this workflow. If these jobs are ever marked
+# "required" in branch protection, such a PR would be blocked forever (the required
+# check never reports). This repo is GitHub Free + private, where branch protection
+# is unavailable anyway — but if you upgrade, either don't mark these required, or
+# add a tiny companion workflow with the SAME job names on the inverse path set that
+# reports success.
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "**.tf"
+      - "**.tfvars"
+      - "**.tftest.hcl"
+      - ".terraform-version"
+      - ".tflint.hcl"
+      - ".checkov.yaml"
+      - ".github/workflows/pr-checks.yml"
+
+# Read-only repo access; no GCP secrets in this lane.
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-checks-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  TF_PLUGIN_CACHE_DIR: ${{ github.workspace }}/.terraform-plugin-cache
+  TF_IN_AUTOMATION: "1" # quieter, automation-friendly Terraform output
+  # Pin tooling so CI == local (reproducible). Bump deliberately when ready.
+  CHECKOV_VERSION: "3.3.7"
+  TFLINT_VERSION: "v0.59.1" # pin TFLint too (was floating on @v6's latest)
+
+jobs:
+  # === Format: terraform fmt across the whole repo (fast, blocking) ===
+  format:
+    name: Format
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false # no git op here needs the token — drop it from .git/config (hardening)
+      - name: Resolve pinned Terraform version
+        id: tfver
+        run: echo "version=$(cat .terraform-version)" >> "$GITHUB_OUTPUT"
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: ${{ steps.tfver.outputs.version }}
+          terraform_wrapper: false
+      - name: Check formatting (terraform fmt -check)
+        run: terraform fmt -check -recursive
+
+  # === Validate: all workspaces in one job (loop), no backend/state (blocking) ===
+  validate:
+    name: Validate (all workspaces)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false # no git op here needs the token — drop it from .git/config (hardening)
+      - name: Resolve pinned Terraform version
+        id: tfver
+        run: echo "version=$(cat .terraform-version)" >> "$GITHUB_OUTPUT"
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: ${{ steps.tfver.outputs.version }}
+          terraform_wrapper: false
+      - name: Cache provider plugins
+        uses: actions/cache@v6
+        with:
+          path: ${{ env.TF_PLUGIN_CACHE_DIR }}
+          key: tf-plugins-${{ hashFiles('**/.terraform.lock.hcl') }}
+          restore-keys: tf-plugins-
+      - name: Validate each workspace (init -backend=false, then validate)
+        run: |
+          mkdir -p "$TF_PLUGIN_CACHE_DIR"
+          if [ ! -d environments ]; then
+            echo "No environments/ directory — nothing to validate."; exit 0
+          fi
+          fail=0
+          for ws in $(find environments -name '*.tf' -printf '%h\n' | sort -u); do
+            echo "::group::$ws"
+            if terraform -chdir="$ws" init -backend=false -input=false \
+               && terraform -chdir="$ws" validate; then
+              echo "✓ $ws"
+            else
+              echo "✗ $ws"; fail=1
+            fi
+            echo "::endgroup::"
+          done
+          exit $fail
+
+  # === Unit test: every module with tests in one job (plan + mock_provider, offline) (blocking) ===
+  unit-test:
+    name: Unit tests (terraform test)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      summary: ${{ steps.test.outputs.summary }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false # no git op here needs the token — drop it from .git/config (hardening)
+      - name: Resolve pinned Terraform version
+        id: tfver
+        run: echo "version=$(cat .terraform-version)" >> "$GITHUB_OUTPUT"
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: ${{ steps.tfver.outputs.version }}
+          terraform_wrapper: false
+      - name: Cache provider plugins
+        uses: actions/cache@v6
+        with:
+          path: ${{ env.TF_PLUGIN_CACHE_DIR }}
+          key: tf-plugins-${{ hashFiles('**/.terraform.lock.hcl') }}
+          restore-keys: tf-plugins-
+      - name: Run module tests (init -backend=false, then terraform test)
+        id: test
+        run: |
+          set +e # don't let a failing `terraform test` abort the step before the summary is written
+          mkdir -p "$TF_PLUGIN_CACHE_DIR"
+          fail=0
+          summary=""
+          for m in $(ls -d modules/*/tests 2>/dev/null | xargs -n1 dirname); do
+            name="$(basename "$m")"
+            echo "::group::$name"
+            # Surface init failures (was fully silenced -> a broken init looked like a
+            # mysterious test failure with no logs).
+            if ! terraform -chdir="$m" init -backend=false -input=false; then
+              echo "❌ init failed for $name"
+              echo "::endgroup::"
+              fail=1
+              summary="${summary}• \`${name}\` ❌ init failed<br>"
+              continue
+            fi
+            out="$(terraform -chdir="$m" test 2>&1)"; rc=$?
+            echo "$out"
+            echo "::endgroup::"
+            # Capture the skipped count too: terraform halts the remaining runs on the
+            # first failure, so a red module reads e.g. "0 passed, 1 failed, 5 skipped".
+            counts="$(printf '%s' "$out" | grep -oE '[0-9]+ passed, [0-9]+ failed(, [0-9]+ skipped)?' | tail -1)"
+            if [ $rc -eq 0 ]; then mark="✅"; else mark="❌"; fail=1; fi
+            summary="${summary}• \`${name}\` ${mark} ${counts:--}<br>"
+          done
+          # Single-line output (<br> separators): multiline job outputs are dropped from
+          # a FAILED job, single-line ones survive — so the breakdown shows on failure too.
+          echo "summary=$summary" >> "$GITHUB_OUTPUT"
+          exit $fail
+
+  # === Security scan: Checkov (BLOCKING — curated policy in .checkov.yaml) ===
+  security-scan:
+    name: Security scan (Checkov)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      summary: ${{ steps.scan.outputs.summary }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false # no git op here needs the token — drop it from .git/config (hardening)
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Install Checkov (pinned)
+        run: pip install "checkov==${CHECKOV_VERSION}"
+      - name: Scan Terraform (checkov)
+        id: scan
+        run: |
+          set +e
+          checkov -d . --config-file .checkov.yaml --compact | tee /tmp/ckv.txt
+          code=${PIPESTATUS[0]}
+          # First "Passed checks:" line (terraform framework); strip ANSI + leading space.
+          line="$(grep -aE 'Passed checks:' /tmp/ckv.txt | head -1 \
+                  | sed -E 's/\x1b\[[0-9;]*m//g; s/^[[:space:]]+//')"
+          echo "summary=${line:-n/a}" >> "$GITHUB_OUTPUT"
+          exit $code
+
+  # === Lint: TFLint across all workspaces in one job (BLOCKING — repo is clean) ===
+  lint:
+    name: Lint (TFLint, all workspaces)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      # FIX: with `--chdir=<ws>` TFLint looks for `.tflint.hcl` INSIDE that workspace,
+      # so the curated repo-root config was silently ignored per workspace. Point every
+      # invocation at the absolute root config instead.
+      TFLINT_CONFIG_FILE: ${{ github.workspace }}/.tflint.hcl
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false # no git op here needs the token — drop it from .git/config (hardening)
+      - name: Setup TFLint
+        uses: terraform-linters/setup-tflint@v6
+        with:
+          tflint_version: ${{ env.TFLINT_VERSION }}
+      - name: Initialize TFLint plugins
+        env:
+          # Authenticated plugin downloads avoid GitHub's anonymous rate limit (a common
+          # flaky-CI cause for `tflint --init`).
+          GITHUB_TOKEN: ${{ github.token }}
+        run: tflint --init
+      - name: Lint each workspace (tflint)
+        run: |
+          if [ ! -d environments ]; then
+            echo "No environments/ directory — nothing to lint."; exit 0
+          fi
+          fail=0
+          for ws in $(find environments -name '*.tf' -printf '%h\n' | sort -u); do
+            echo "::group::$ws"
+            tflint --chdir="$ws" -f compact || fail=1
+            echo "::endgroup::"
+          done
+          exit $fail
+
+  # === Report: post a results summary to the PR as a sticky comment (update, not spam) ===
+  report:
+    name: Report to PR
+    needs: [format, validate, unit-test, lint, security-scan]
+    # Skip on fork PRs: with the `pull_request` trigger the GITHUB_TOKEN is read-only for
+    # forks, so the comment POST would 403 and fail the job. (Internal-branch PRs are fine.)
+    if: always() && github.event.pull_request.number != '' && github.event.pull_request.head.repo.fork == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: write
+      actions: read # read the separate Secret Scanning (Gitleaks) workflow result
+    steps:
+      - name: Post / update PR comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          R_FMT: ${{ needs.format.result }}
+          R_VAL: ${{ needs.validate.result }}
+          R_TEST: ${{ needs.unit-test.result }}
+          R_LINT: ${{ needs.lint.result }}
+          R_SEC: ${{ needs.security-scan.result }}
+          CKV: ${{ needs.security-scan.outputs.summary }}
+          TESTS: ${{ needs.unit-test.outputs.summary }}
+        run: |
+          icon() {
+            case "$1" in
+              success) echo "✅ Passed" ;;
+              failure) echo "❌ Failed" ;;
+              skipped) echo "⏭️ Skipped" ;;
+              cancelled) echo "🚫 Cancelled" ;;
+              *) echo "❔ $1" ;;
+            esac
+          }
+          # Gitleaks runs in a SEPARATE workflow (secret-scan.yml, not path-filtered), so it
+          # isn't a `needs` dependency here. By the time this report runs (after all TF gates)
+          # that fast job has finished — fetch its conclusion for this commit and fold it in.
+          GL="$(gh api "repos/$REPO/actions/workflows/secret-scan.yml/runs?head_sha=$HEAD_SHA&event=pull_request&per_page=1" --jq '.workflow_runs[0].conclusion // "pending"' 2>/dev/null || echo pending)"
+
+          # Tally every gate (incl. Gitleaks) and build a colored status strip that
+          # mirrors the table below — 🟩 pass · 🟥 fail · ⬜ skipped/cancelled · 🟨 other.
+          pass=0 total=0 strip=""
+          for r in "$R_FMT" "$R_VAL" "$R_TEST" "$R_LINT" "$R_SEC" "$GL"; do
+            total=$((total + 1))
+            case "$r" in
+              success)           pass=$((pass + 1)); strip="${strip}🟩" ;;
+              failure)                               strip="${strip}🟥" ;;
+              skipped|cancelled)                     strip="${strip}⬜" ;;
+              *)                                     strip="${strip}🟨" ;;
+            esac
+          done
+
+          # GitHub alert callout: green [!TIP] when clean, red [!CAUTION] otherwise.
+          if [ "$pass" -eq "$total" ]; then
+            alert="TIP";     banner="✅ **All checks passed**"
+          else
+            alert="CAUTION"; banner="❌ **Some checks failed**"
+          fi
+
+          marker="<!-- pr-checks-report -->"
+          {
+            echo "$marker"
+            printf '## 🔎 Terraform · PR Checks\n\n'
+            printf '> [!%s]\n' "$alert"
+            printf '> %s — **%s / %s** gates green · commit `%s`\n' "$banner" "$pass" "$total" "${HEAD_SHA:0:7}"
+            printf '>\n'
+            printf '> %s\n\n' "$strip"
+            printf '| | Gate | Result |\n| :--: | :-- | :--: |\n'
+            printf '| 🎨 | Format | %s |\n' "$(icon "$R_FMT")"
+            printf '| 🧱 | Validate · all workspaces | %s |\n' "$(icon "$R_VAL")"
+            printf '| 🧪 | Unit tests · terraform test | %s |\n' "$(icon "$R_TEST")"
+            printf '| 🔍 | Lint · TFLint | %s |\n' "$(icon "$R_LINT")"
+            printf '| 🛡️ | Security · Checkov | %s |\n' "$(icon "$R_SEC")"
+            printf '| 🔑 | Secret scanning · Gitleaks | %s |\n\n' "$(icon "$GL")"
+            printf '<details><summary>🧪 <b>terraform test</b> — per-module breakdown</summary>\n\n%s\n</details>\n\n' "${TESTS:-_n/a_}"
+            printf '<details><summary>🛡️ <b>Checkov</b> — policy summary</summary>\n\n%s\n</details>\n\n' "${CKV:-n/a}"
+            printf -- '<sub>🔄 Updated %s · <a href="%s">View full run ↗</a></sub>\n' "$(date -u '+%Y-%m-%d %H:%M UTC')" "$RUN_URL"
+          } > /tmp/body.md
+          id="$(gh api "repos/$REPO/issues/$PR/comments" --jq "[.[] | select(.body | contains(\"$marker\")) | .id] | first // empty")"
+          if [ -n "$id" ]; then
+            gh api -X PATCH "repos/$REPO/issues/comments/$id" -F body=@/tmp/body.md >/dev/null
+            echo "updated comment #$id"
+          else
+            gh api -X POST "repos/$REPO/issues/$PR/comments" -F body=@/tmp/body.md >/dev/null
+            echo "created comment"
+          fi
