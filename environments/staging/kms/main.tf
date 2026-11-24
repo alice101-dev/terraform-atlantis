@@ -6,7 +6,7 @@
 #
 # Apply order: services (enable cloudkms API + provision service agent) → KMS →
 #              {kubernetes-engine, cloud-sql-postgres-app, artifact-registry,
-#               backup-for-gke}.
+#               backup-for-gke, PV Atlantis}.
 #
 # Konsumen memakai key via data-source by-name (bukan remote_state), mis. GKE:
 #   database_encryption { state = "ENCRYPTED", key_name = <crypto_key gke> }
@@ -33,6 +33,8 @@ locals {
     "artifact-registry" = ["serviceAccount:service-${data.google_project.this.number}@gcp-sa-artifactregistry.iam.gserviceaccount.com"]
     # Backup for GKE (bagian "config" backup — resource Kubernetes)
     "backup-gke" = ["serviceAccount:service-${data.google_project.this.number}@gcp-sa-gkebackup.iam.gserviceaccount.com"]
+    # PV Atlantis (PD CSI) — disk dienkripsi oleh Compute Engine agent
+    atlantis = ["serviceAccount:service-${data.google_project.this.number}@compute-system.iam.gserviceaccount.com"]
   }
 
   # Bangun binding hanya untuk key yang benar-benar dibuat di crypto_keys.

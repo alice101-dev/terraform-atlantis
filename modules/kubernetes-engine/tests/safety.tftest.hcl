@@ -384,6 +384,14 @@ run "rejects_autopilot_mode" {
   expect_failures = [var.enable_autopilot]
 }
 
+run "rejects_invalid_gateway_api_channel" {
+  command = plan
+  variables {
+    gateway_api_channel = "STANDARD" # tanpa prefix CHANNEL_
+  }
+  expect_failures = [var.gateway_api_channel]
+}
+
 run "rejects_invalid_networking_mode" {
   command = plan
   variables {
