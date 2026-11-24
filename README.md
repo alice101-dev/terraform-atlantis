@@ -149,7 +149,7 @@ PR flow:
 
 1. Change a workspace (e.g. add a bucket key in `environments/staging/cloud-storage/staging.tfvars`) and open a PR.
 2. Atlantis plans the changed projects and runs the conftest `guardrails` policy on the plan.
-3. If the policy fails (delete of a stateful resource, project IAM, service account, open firewall), review it and comment `atlantis approve_policies -p staging-<service>`.
+3. If the policy fails (delete of a stateful resource, lowered deletion protection, project IAM, service account, open firewall), review it and comment `atlantis approve_policies -p staging-<service>`.
 4. When CI is green and the branch is up to date, comment `atlantis apply -p staging-<service>`.
 5. Atlantis merges the PR once every project is applied (`automerge: true`).
 
@@ -229,7 +229,7 @@ Atlantis can change real infrastructure, so it is locked down layer by layer —
 | Only PRs authored by `alice101-dev` are planned; only `alice101-dev` can apply | `repoConfig` workflow `guarded` (`PULL_AUTHOR` / `USER_NAME`) |
 | Apply requires `mergeable` (CI green, branch protection) + `undiverged`; a new plan discards approvals | `repoConfig`, `ATLANTIS_DISCARD_APPROVAL_ON_PLAN` |
 | Workflow, requirements and policies can't be overridden from a PR | `allowed_overrides: []`, `allow_custom_workflows: false` |
-| conftest `guardrails`: delete/replace of stateful resources, project IAM, service accounts, `0.0.0.0/0` firewalls need `atlantis approve_policies` (owner only) | `gitops/atlantis/config/files/policies/guardrails.rego` |
+| conftest `guardrails`: delete/replace of stateful resources, lowering deletion protection (`true` → `false`, `PREVENT` → `DELETE`), project IAM, service accounts, `0.0.0.0/0` firewalls need `atlantis approve_policies` (owner only) | `gitops/atlantis/config/files/policies/guardrails.rego` |
 | Plan/apply output in the public PR has the project ID / number redacted; links point to `localhost` | `repoConfig` (`run` + `sed`), `atlantisUrl` |
 
 ### GCP, secrets, repository
