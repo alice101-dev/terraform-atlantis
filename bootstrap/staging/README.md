@@ -16,7 +16,8 @@ Workspace lain menyimpan state di bucket GCS — tapi workspace **ini** yang mem
 ```bash
 cd bootstrap/staging
 
-# 1. Apply pertama — backend.tf masih terkomentar → state lokal
+# 1. Apply pertama dengan state lokal — KOMENTARI dulu blok backend di backend.tf
+#    (bucket belum ada, init ke backend gcs akan gagal)
 terraform init
 terraform validate
 terraform plan -var-file="staging.tfvars"
