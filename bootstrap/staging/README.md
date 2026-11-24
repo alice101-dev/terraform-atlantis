@@ -33,7 +33,7 @@ rm -f terraform.tfstate terraform.tfstate.backup
 
 # 5. Verifikasi
 terraform plan -var-file="staging.tfvars"      # harus: No changes
-gcloud storage buckets describe gs://staging-tfstate-jbpbgb \
+gcloud storage buckets describe gs://staging-tfstate-3494211213 \
   --format="yaml(versioning, soft_delete_policy, uniform_bucket_level_access, public_access_prevention)"
 ```
 
@@ -60,7 +60,7 @@ Kalau bucket terlanjur ada di luar Terraform (mis. dibuat via Console/`gcloud`),
 ```hcl
 # imports.tf (sementara, hapus setelah import sukses)
 import {
-  id = "<project-id>/staging-tfstate-jbpbgb"
+  id = "<project-id>/staging-tfstate-3494211213"
   to = module.state_bucket.google_storage_bucket.state
 }
 ```

@@ -1,6 +1,6 @@
 terraform {
   backend "gcs" {
-    bucket = "staging-tfstate-jbpbgb"
+    bucket = "staging-tfstate-3494211213"
     prefix = "staging/backup-for-gke"
   }
 }

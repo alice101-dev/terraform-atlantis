@@ -16,7 +16,7 @@ variable "env" {
 
 # --- State Bucket ---
 variable "state_bucket_name" {
-  description = "Nama dasar bucket state TANPA prefix env (wrapper menambahkan prefix env sekali, contoh: tfstate-jbpbgb → staging-tfstate-jbpbgb). Nama bucket GCS global-unik — pakai suffix acak."
+  description = "Nama dasar bucket state TANPA prefix env (wrapper menambahkan prefix env sekali, contoh: tfstate-3494211213 → staging-tfstate-3494211213). Nama bucket GCS global-unik — pakai suffix angka acak."
   type        = string
 }
 

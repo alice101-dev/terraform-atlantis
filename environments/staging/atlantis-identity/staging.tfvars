@@ -33,5 +33,5 @@ kubernetes_service_accounts = [
 
 # State Terraform: baca/tulis objek (termasuk lock), tanpa hak ubah IAM bucket.
 bucket_roles = [
-  { bucket = "staging-tfstate-jbpbgb", role = "roles/storage.objectAdmin" },
+  { bucket = "staging-tfstate-3494211213", role = "roles/storage.objectAdmin" },
 ]
