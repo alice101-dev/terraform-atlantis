@@ -47,6 +47,7 @@ variable "cloud_nat_configs" {
     # --- IP Allocation ---
     nat_ip_allocate_option = optional(string, "MANUAL_ONLY")
     nat_ip_count           = optional(number, 2)
+    nat_ip_attached_count  = optional(number)
 
     # --- Subnet Scope ---
     source_subnetwork_ip_ranges_to_nat = optional(string, "ALL_SUBNETWORKS_ALL_IP_RANGES")

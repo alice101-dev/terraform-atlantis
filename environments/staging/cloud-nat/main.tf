@@ -38,6 +38,7 @@ module "cloud_nat" {
   # IP allocation
   nat_ip_allocate_option = each.value.nat_ip_allocate_option
   nat_ip_count           = each.value.nat_ip_count
+  nat_ip_attached_count  = each.value.nat_ip_attached_count
 
   # Subnet scope
   source_subnetwork_ip_ranges_to_nat = each.value.source_subnetwork_ip_ranges_to_nat

@@ -43,6 +43,17 @@ variable "nat_ip_count" {
   }
 }
 
+variable "nat_ip_attached_count" {
+  description = "Jumlah IP (dari urutan pertama) yang dipasang ke NAT. null = semua nat_ip_count. Untuk mengurangi IP: turunkan nilai ini dulu (apply), baru turunkan nat_ip_count (apply)."
+  type        = number
+  default     = null
+
+  validation {
+    condition     = var.nat_ip_attached_count == null || (var.nat_ip_attached_count >= 1 && var.nat_ip_attached_count <= var.nat_ip_count)
+    error_message = "nat_ip_attached_count harus null atau antara 1 dan nat_ip_count."
+  }
+}
+
 # --- Subnet Scope ---
 
 variable "source_subnetwork_ip_ranges_to_nat" {

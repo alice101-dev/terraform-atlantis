@@ -33,7 +33,8 @@ cloud_nat_configs = {
 
     # IP allocation
     nat_ip_allocate_option = "MANUAL_ONLY"
-    nat_ip_count           = 1 # cukup untuk staging; tambah kalau port exhaustion
+    nat_ip_count           = 2
+    nat_ip_attached_count  = 1 # NAT hanya memakai IP pertama
 
     # Port allocation (dynamic is recommended for variable workloads)
     enable_dynamic_port_allocation = true
