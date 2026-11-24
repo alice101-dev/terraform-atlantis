@@ -1,5 +1,7 @@
 # GCP Infrastructure Provisioning with Terraform
 
+Terraform for GCP, planned and applied from pull requests by a **hardened Atlantis** running on GKE: deployed with Argo CD, reachable only through Cloudflare, guarded by policy checks, and running with least-privilege GCP access. See *🔐 Security*.
+
 Small, reusable modules + decoupled per-service workspaces (each with its own state) to keep the blast radius low. Workspaces find each other **by name** (`data` sources), not `terraform_remote_state`.
 
 ## 📂 Layout
