@@ -5,7 +5,7 @@ env    = "staging"
 
 # --- Deletion Protection ---
 # false sengaja untuk siklus teardown staging. Untuk prod kembalikan ke true.
-deletion_protection = true
+deletion_protection = false
 
 # --- CMEK ---
 kms_key_ring_name = "hades-keyring"
