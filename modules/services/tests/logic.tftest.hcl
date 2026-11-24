@@ -4,6 +4,7 @@
 # Jalankan: terraform -chdir=modules/services test
 
 mock_provider "google" {}
+mock_provider "google-beta" {}
 
 variables {
   project_id = "test-project"
@@ -52,4 +53,35 @@ run "disable_on_destroy_can_enable" {
     condition     = google_project_service.enabled_apis["compute.googleapis.com"].disable_on_destroy == true
     error_message = "disable_on_destroy must be honoured when set true."
   }
+}
+
+# --- Service agent dibuat per API yang diminta ---
+run "creates_service_agents" {
+  command = plan
+
+  variables {
+    enabled_apis       = ["sqladmin.googleapis.com", "secretmanager.googleapis.com"]
+    service_identities = ["sqladmin.googleapis.com", "secretmanager.googleapis.com"]
+  }
+
+  assert {
+    condition     = length(google_project_service_identity.agents) == 2
+    error_message = "One google_project_service_identity per service_identities entry."
+  }
+  assert {
+    condition     = google_project_service_identity.agents["secretmanager.googleapis.com"].project == "test-project"
+    error_message = "Service agent must be created in the given project."
+  }
+}
+
+# --- Service agent untuk API yang tidak di-enable ditolak ---
+run "rejects_agent_for_disabled_api" {
+  command = plan
+
+  variables {
+    enabled_apis       = ["compute.googleapis.com"]
+    service_identities = ["sqladmin.googleapis.com"]
+  }
+
+  expect_failures = [var.service_identities]
 }

@@ -54,7 +54,7 @@ services  →  service-accounts  →  iam
 
 Prerequisites that aren't visible in the graph:
 - `service-accounts`, `iam` and `services` have no VPC dependency.
-- `kms` must apply before its consumers (they look keys up by name; Cloud SQL CMEK is create-time only). Its IAM bindings need the service agents to exist — the human runs once per project: `gcloud beta services identity create --service={sqladmin,artifactregistry,gkebackup,container,secretmanager}.googleapis.com`.
+- `kms` must apply before its consumers (they look keys up by name; Cloud SQL CMEK is create-time only). Its IAM bindings need the service agents to exist — they come from `service_identities` in the `services` workspace (`google_project_service_identity`, `google-beta` provider), so `services` applies first. No manual `gcloud` step.
 - `backup-for-gke` needs the cluster to exist with `enable_gke_backup_agent = true`.
 - **Atlantis:** a workspace is Atlantis-managed only if it has a project in the root `atlantis.yaml` (autodiscover is off). Add `name: <env>-<service>`, `dir`, and `when_modified` including `../../../modules/<module>/*.tf`. Its resources must be covered by the roles in `atlantis-identity` (add a role there — human-applied — when a new service type is introduced).
 - `argocd-bootstrap` uses the `helm` provider through the GKE **DNS endpoint** (IAM token, no CA) and reads `<env>-atlantis-hostname` from Secret Manager into the cluster-secret annotation `platform/public-hostname` — the office domain never lands in Git. Human-only.

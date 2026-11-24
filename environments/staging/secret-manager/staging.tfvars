@@ -35,7 +35,4 @@ secrets = {
   "atlantis-gh-webhook-secret" = {
     workload_identity = [{ namespace = "atlantis", service_account = "atlantis-secrets" }]
   }
-  "atlantis-web-password" = {
-    workload_identity = [{ namespace = "atlantis", service_account = "atlantis-secrets" }]
-  }
 }

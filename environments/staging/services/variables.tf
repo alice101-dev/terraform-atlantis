@@ -24,3 +24,9 @@ variable "disable_on_destroy" {
   type        = bool
   default     = false
 }
+
+variable "service_identities" {
+  description = "API yang service agent-nya dibuat lewat Terraform (dipakai IAM binding CMEK di workspace kms)"
+  type        = set(string)
+  default     = []
+}

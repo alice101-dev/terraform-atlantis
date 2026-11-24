@@ -84,6 +84,6 @@ entitlements = {
 ## Catatan
 
 - **API prasyarat:** `privilegedaccessmanager.googleapis.com` (tambahkan ke `enabled_apis` workspace `services` env terkait).
-- **PAM service agent** meng-grant role saat grant disetujui — trigger sekali per project (human-run): `gcloud beta services identity create --service=privilegedaccessmanager.googleapis.com`.
+- **PAM service agent** meng-grant role saat grant disetujui — tambahkan `privilegedaccessmanager.googleapis.com` ke `service_identities` (dan `enabled_apis`) di workspace `services`.
 - Entitlement bukan resource stateful (tidak menyimpan data) — tanpa deletion guard, selaras modul `iam`.
 - `approvals_needed` di-hardcode `1` — satu-satunya nilai yang didukung API saat ini.

@@ -75,12 +75,9 @@ brew install pipx && pipx ensurepath && pipx install checkov==3.3.7
 gcloud auth login && gcloud auth application-default login
 gcloud config set project <your-gcp-project-id>
 export TF_VAR_project_id="$(gcloud config get-value project)"
-
-# KMS service agents must exist before the kms workspace applies
-for s in sqladmin artifactregistry gkebackup container secretmanager; do
-  gcloud beta services identity create --service=$s.googleapis.com --project="$(gcloud config get-value project)"
-done
 ```
+
+Service agents needed by the CMEK bindings in `kms` are created by the `services` workspace (`service_identities`, `google-beta` provider).
 
 State bucket: create it with `bootstrap/<env>/` — steps in `bootstrap/staging/README.md`.
 
@@ -95,7 +92,7 @@ Personal data and credentials stay out of Git. The `secret-manager` workspace cr
 | `staging-atlantis-hostname` | `argocd-bootstrap` | public hostname of Atlantis |
 | `staging-cloudflare-api-token` | cert-manager (KSA `cert-manager/cert-manager-secrets`) | Cloudflare API token: `Zone:DNS:Edit` + `Zone:Zone:Read`, scoped to the one zone |
 | `staging-atlantis-gh-app-id`, `staging-atlantis-gh-app-slug` | `argocd-bootstrap` | GitHub App ID and slug |
-| `staging-atlantis-gh-app-key`, `-gh-webhook-secret`, `-web-password` | Atlantis (KSA `atlantis/atlantis-secrets`) | GitHub App private key (PEM), webhook secret, web UI password |
+| `staging-atlantis-gh-app-key`, `staging-atlantis-gh-webhook-secret` | Atlantis (KSA `atlantis/atlantis-secrets`) | GitHub App private key (PEM), webhook secret |
 
 ```bash
 printf '%s' '{"you@example.com":["engineer"]}' | gcloud secrets versions add staging-iam-memberships --data-file=-
@@ -152,7 +149,7 @@ Policy tests: `docker run --rm -v "$PWD/gitops/atlantis/config:/w:ro" -w /w --en
 ### One-time setup (human)
 
 1. **GitHub App** (private, "Only on this account", installed on this repo only): repository permissions Actions (read), Administration (read), Checks (rw), Commit statuses (rw), Contents (rw), Issues (rw), Metadata (read), Pull requests (rw), Webhooks (rw). App-level webhook **off** — for a manually created App the Atlantis docs say not to set webhook details on the App. Generate a private key and keep it outside the repo until it is stored in Secret Manager.
-2. **Secret values** (README → *Private inputs*): hostname, App ID, App slug, private key, webhook secret, web password, Cloudflare token.
+2. **Secret values** (README → *Private inputs*): hostname, App ID, App slug, private key, webhook secret, Cloudflare token. The web UI password is generated in-cluster (ESO `Password` generator): `kubectl -n atlantis get secret atlantis-basic-auth -o jsonpath='{.data.password}' | base64 -d`.
 3. **Repository webhook** (repo → Settings → Webhooks): payload URL `https://<hostname>/events`, content type `application/json`, secret = the value in `staging-atlantis-gh-webhook-secret`, events Pull request reviews, Pushes, Issue comments, Pull requests.
 4. **Cloudflare** (zone owner):
    - DNS `A` record `<hostname>` → `terraform -chdir=environments/staging/static-ip output addresses`, **proxied**.
