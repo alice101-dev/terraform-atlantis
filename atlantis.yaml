@@ -101,3 +101,12 @@ projects:
         - "*.tfvars"
         - ".terraform.lock.hcl"
         - "../../../modules/backup-for-gke/*.tf"
+  - name: staging-cloud-storage
+    dir: environments/staging/cloud-storage
+    autoplan:
+      enabled: true
+      when_modified:
+        - "*.tf"
+        - "*.tfvars"
+        - ".terraform.lock.hcl"
+        - "../../../modules/gcs-bucket/*.tf"
