@@ -12,6 +12,11 @@ locals {
     managed_by = "terraform"
   }
 
+  # Proteksi efektif per bucket: override per bucket, kalau null ikut default workspace.
+  protected = {
+    for k, b in var.buckets : k => b.deletion_protection != null ? b.deletion_protection : var.deletion_protection
+  }
+
   bucket_iam = merge([
     for bucket, b in var.buckets : {
       for m in b.iam_members : "${bucket}|${m.role}|${m.member}" => merge(m, { bucket = bucket })
@@ -35,7 +40,7 @@ resource "google_storage_bucket" "this" {
   force_destroy               = false
 
   # PREVENT: destroy gagal keras selama deletion_protection = true.
-  deletion_policy = var.deletion_protection ? "PREVENT" : "DELETE"
+  deletion_policy = local.protected[each.key] ? "PREVENT" : "DELETE"
 
   # Versioning selalu aktif (rollback overwrite/hapus); biaya versi lama
   # dikendalikan lewat lifecycle_rules.
@@ -82,7 +87,7 @@ resource "google_storage_bucket_iam_member" "this" {
 # Guard Terraform — prevent_destroy sengaja false (konvensi repo: mudah teardown);
 # perlindungan utama = deletion_policy di atas.
 resource "null_resource" "deletion_protection" {
-  count = var.deletion_protection ? 1 : 0
+  for_each = { for k, p in local.protected : k => p if p }
 
   lifecycle {
     prevent_destroy = false
