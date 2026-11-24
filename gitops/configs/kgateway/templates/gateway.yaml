@@ -1,0 +1,61 @@
+apiVersion: gateway.kgateway.dev/v1alpha1
+kind: GatewayParameters
+metadata:
+  name: {{ .Values.gateway.name }}
+spec:
+  kube:
+    deployment:
+      replicas: {{ .Values.gateway.replicas }}
+    podDisruptionBudget:
+      spec:
+        maxUnavailable: 1
+    podTemplate:
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              gateway.networking.k8s.io/gateway-name: {{ .Values.gateway.name }}
+    envoyContainer:
+      resources:
+        requests: { cpu: 50m, memory: 64Mi }
+        limits: { memory: 256Mi }
+    service:
+      type: LoadBalancer
+      # L4 regional external NLB (backend service) + IP statis by-name dari
+      # workspace Terraform static-ip.
+      loadBalancerClass: networking.gke.io/l4-regional-external
+      extraAnnotations:
+        networking.gke.io/load-balancer-ip-addresses: {{ required "platform.gatewayIpName wajib" .Values.platform.gatewayIpName }}
+      loadBalancerSourceRanges:
+        {{- toYaml .Values.gateway.sourceRanges | nindent 8 }}
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: {{ .Values.gateway.name }}
+spec:
+  gatewayClassName: kgateway
+  infrastructure:
+    parametersRef:
+      group: gateway.kgateway.dev
+      kind: GatewayParameters
+      name: {{ .Values.gateway.name }}
+  # HTTPS saja — tanpa port 80 (sertifikat via DNS-01, Cloudflare terminasi HTTP).
+  listeners:
+    - name: https
+      protocol: HTTPS
+      port: 443
+      hostname: {{ required "platform.publicHostname wajib" .Values.platform.publicHostname | quote }}
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - kind: Secret
+            name: {{ .Values.gateway.tlsSecretName }}
+      allowedRoutes:
+        namespaces:
+          from: Selector
+          selector:
+            matchLabels:
+              platform/gateway: {{ .Values.gateway.name }}

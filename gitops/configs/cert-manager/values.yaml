@@ -1,0 +1,17 @@
+# Diisi ApplicationSet configs dari anotasi cluster (lihat gitops/appsets/configs.yaml).
+platform:
+  env: ""
+  projectId: ""
+  region: ""
+  clusterName: ""
+
+# KSA yang dipakai SecretStore; principal-nya diberi secretAccessor per secret
+# di workspace Terraform secret-manager (ns/cert-manager/sa/cert-manager-secrets).
+secretStore:
+  serviceAccount: cert-manager-secrets
+
+cloudflare:
+  # Secret Manager: <env>-cloudflare-api-token (Zone:DNS:Edit + Zone:Zone:Read, satu zone).
+  remoteSecret: cloudflare-api-token
+  secretName: cloudflare-api-token
+  secretKey: api-token

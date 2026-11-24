@@ -35,10 +35,10 @@ module "argocd" {
   cluster_annotations = {
     "platform/project-id"       = var.project_id
     "platform/region"           = var.region
+    "platform/cluster-name"     = data.google_container_cluster.gke.name
     "platform/public-hostname"  = data.google_secret_manager_secret_version_access.atlantis_hostname.secret_data
     "platform/gateway-ip-name"  = "${var.env}-gateway"
     "platform/atlantis-gsa"     = "${var.env}-atlantis@${var.project_id}.iam.gserviceaccount.com"
     "platform/atlantis-kms-key" = "projects/${var.project_id}/locations/${var.region}/keyRings/${var.env}-${var.kms_key_ring_name}/cryptoKeys/${var.env}-${var.kms_key_ring_name}-atlantis"
-    "platform/gitops-revision"  = var.gitops_target_revision
   }
 }

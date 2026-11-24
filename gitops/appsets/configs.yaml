@@ -1,0 +1,69 @@
+# Satu Application per gitops/configs/<nama>/ (chart Helm lokal), aktif kalau
+# cluster berlabel enable_<requires>=true. Nilai per-env yang tidak boleh di
+# Git (hostname, project, dsb.) dibaca dari anotasi cluster secret (diisi
+# Terraform argocd-bootstrap) dan dikirim sebagai .Values.platform.
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: configs
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - matrix:
+        generators:
+          - git:
+              repoURL: https://github.com/alice101-dev/terraform-atlantis.git
+              revision: main
+              files:
+                - path: gitops/configs/*/config.yaml
+          - clusters:
+              selector:
+                matchLabels:
+                  enable_{{ .requires }}: "true"
+                matchExpressions:
+                  - key: env
+                    operator: Exists
+  template:
+    metadata:
+      name: "config-{{ .path.basename }}"
+      labels:
+        layer: configs
+      finalizers:
+        - resources-finalizer.argocd.argoproj.io
+    spec:
+      project: platform
+      source:
+        repoURL: https://github.com/alice101-dev/terraform-atlantis.git
+        targetRevision: main
+        path: "{{ .path.path }}"
+        helm:
+          releaseName: "{{ .path.basename }}"
+          valuesObject:
+            platform:
+              env: '{{ index .metadata.labels "env" }}'
+              projectId: '{{ index .metadata.annotations "platform/project-id" }}'
+              region: '{{ index .metadata.annotations "platform/region" }}'
+              clusterName: '{{ index .metadata.annotations "platform/cluster-name" }}'
+              publicHostname: '{{ index .metadata.annotations "platform/public-hostname" }}'
+              gatewayIpName: '{{ index .metadata.annotations "platform/gateway-ip-name" }}'
+              atlantisGsa: '{{ index .metadata.annotations "platform/atlantis-gsa" }}'
+              atlantisKmsKey: '{{ index .metadata.annotations "platform/atlantis-kms-key" }}'
+      destination:
+        name: "{{ .name }}"
+        namespace: "{{ .namespace }}"
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        # Namespace dibuat & diberi label PSA oleh Application controller-nya.
+        syncOptions:
+          - ServerSideApply=true
+          - SkipDryRunOnMissingResource=true
+        retry:
+          limit: 20
+          backoff:
+            duration: 30s
+            factor: 2
+            maxDuration: 5m

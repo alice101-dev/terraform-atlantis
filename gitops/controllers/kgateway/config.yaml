@@ -1,0 +1,4 @@
+chart: kgateway
+repoURL: cr.kgateway.dev/kgateway-dev/charts
+version: 2.5.2
+namespace: kgateway-system
