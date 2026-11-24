@@ -174,7 +174,7 @@ A plan that deletes a protected resource fails the policy check and blocks the m
 1. **GitHub App** (private, "Only on this account", installed on this repo only): repository permissions Actions (read), Administration (read), Checks (rw), Commit statuses (rw), Contents (rw), Issues (rw), Metadata (read), Pull requests (rw), Webhooks (rw). App-level webhook **off** — for a manually created App the Atlantis docs say not to set webhook details on the App. Generate a private key and keep it outside the repo until it is stored in Secret Manager.
 2. **Secret values** (README → *Private inputs*): hostname, App ID, App slug, private key, webhook secret, Cloudflare token. The web UI password is generated in-cluster (ESO `Password` generator): `kubectl -n atlantis get secret atlantis-basic-auth -o jsonpath='{.data.password}' | base64 -d`.
 3. **Repository webhook** (repo → Settings → Webhooks): payload URL `https://<hostname>/events`, content type `application/json`, secret = the value in `staging-atlantis-gh-webhook-secret`, events Pull request reviews, Pushes, Issue comments, Pull requests.
-4. **Cloudflare** (zone owner):
+4. **Cloudflare**:
    - DNS `A` record `<hostname>` → `terraform -chdir=environments/staging/static-ip output addresses`, **proxied**.
    - SSL/TLS mode **Full (strict)** for the hostname.
    - WAF custom rule on `http.host eq "<hostname>"`: allow only `POST /events` from the GitHub `hooks` ranges (`gh api meta -q .hooks`), block everything else.
@@ -239,7 +239,7 @@ Atlantis can change real infrastructure, so it is locked down layer by layer —
 | Secret Manager with CMEK and per-secret IAM to the consuming KSA only | `environments/staging/secret-manager` |
 | `deletion_protection` → native protection / `deletion_policy = PREVENT` (`true` in production) | each workspace `.tfvars` |
 | Branch protection + required checks; interaction limits (collaborators only); GitHub Actions pinned by commit SHA; Gitleaks, Checkov, TFLint, conftest tests in CI | `.github/` |
-| No project IDs, personal emails, admin IPs or company domain in Git — per-env values come from Secret Manager and cluster-secret annotations | `argocd-bootstrap`, `CLAUDE.md` |
+| No project IDs, emails, admin IPs or hostnames in Git — per-env values come from Secret Manager and cluster-secret annotations | `argocd-bootstrap` |
 
 ## 📖 Cheat sheet
 

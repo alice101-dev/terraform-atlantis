@@ -10,7 +10,7 @@ Claude is **plan-only**. Hard limits are enforced in `.claude/settings.json` (de
 - **Never** `terraform apply`/`destroy`/`import`/`taint`, any `state` mutation, `init -migrate-state`, `force-unlock`, `workspace new/select/delete`, or `plan -destroy` — in any form (`-chdir`, wrappers, scripts). Real applies run via CI/CD or a human.
 - **Safe:** `init`, `validate`, `fmt`, `plan -var-file="<env>.tfvars"`, `providers`, `output` (no `-json`/`-raw`), `terraform test` (only `command = plan` + `mock_provider`), `checkov`.
 - **GCP & Kubernetes are read-only.** Only `list`/`describe`/`get`/`logs`, and only when it helps the current task. For a fix that mutates cloud, write the exact command for the human to run.
-- **No secrets or personal data in Git** (repo is public): no project IDs, user emails, public admin IPs or company domains in `.tf`/`.tfvars`/docs. Secrets and private inputs live in GCP Secret Manager (`google_secret_manager_secret_version_access` data source) or use IAM auth.
+- **No secrets or personal data in Git** (repo is public): no project IDs, user emails, public admin IPs or hostnames in `.tf`/`.tfvars`/docs. Secrets and private inputs live in GCP Secret Manager (`google_secret_manager_secret_version_access` data source) or use IAM auth.
 - Never commit `.terraform/`, `*.tfstate*`, `*.tfplan`. Never push to `main` — branch + PR.
 - To destroy a protected resource, point the human to README → *Destroying a guard-protected resource (SOP)*: `deletion_protection = false` → apply → destroy. Only the KMS CryptoKey and the state bucket carry a literal `prevent_destroy = true` (code change needed).
 
