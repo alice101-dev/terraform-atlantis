@@ -45,6 +45,7 @@ Workspaces **do not** read each other's state with `terraform_remote_state`. The
 **Apply order:**
 ```
 services  →  service-accounts  →  iam
+          →  kms (CMEK)  →  secret-manager  →  iam │ kubernetes-engine (private inputs)
           →  kms (CMEK)  →  kubernetes-engine │ cloud-sql-postgres-app │ artifact-registry │ backup-for-gke
           →  vpc (network + PSA)  →  cloud-nat │ firewall │ kubernetes-engine  →  backup-for-gke
                                   →  cloud-sql (PSC subnet / PSA connection from vpc)
@@ -53,8 +54,9 @@ services  →  service-accounts  →  iam
 
 Prerequisites that aren't visible in the graph:
 - `service-accounts`, `iam` and `services` have no VPC dependency.
-- `kms` must apply before its consumers (they look keys up by name; Cloud SQL CMEK is create-time only). Its IAM bindings need the service agents to exist — the human runs once per project: `gcloud beta services identity create --service={sqladmin,artifactregistry,gkebackup,container}.googleapis.com`.
+- `kms` must apply before its consumers (they look keys up by name; Cloud SQL CMEK is create-time only). Its IAM bindings need the service agents to exist — the human runs once per project: `gcloud beta services identity create --service={sqladmin,artifactregistry,gkebackup,container,secretmanager}.googleapis.com`.
 - `backup-for-gke` needs the cluster to exist with `enable_gke_backup_agent = true`.
+- `iam` and `kubernetes-engine` read private inputs (user emails, admin IP) from Secret Manager: `secret-manager` must be applied **and** the human must add the secret versions first.
 
 ## Running a workspace
 

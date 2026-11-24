@@ -24,7 +24,7 @@ key_ring_name = "hades-keyring"
 protection_level = "SOFTWARE"
 
 # --- Crypto Keys (satu per konsumen = least-privilege) ---
-# Key map (gke / cloud-sql / artifact-registry / backup-gke / atlantis) HARUS cocok dengan
+# Key map (gke / cloud-sql / artifact-registry / backup-gke / atlantis / secret-manager) HARUS cocok dengan
 # local.service_agents di main.tf agar binding IAM cryptoKeyEncrypterDecrypter
 # otomatis terpasang.
 #
@@ -61,6 +61,12 @@ crypto_keys = {
   }
   # Disk PV Atlantis (file plan bisa berisi nilai sensitif) — via StorageClass CMEK.
   atlantis = {
+    purpose         = "ENCRYPT_DECRYPT"
+    algorithm       = "GOOGLE_SYMMETRIC_ENCRYPTION"
+    rotation_period = "7776000s"
+  }
+  # Replika secret di workspace secret-manager.
+  "secret-manager" = {
     purpose         = "ENCRYPT_DECRYPT"
     algorithm       = "GOOGLE_SYMMETRIC_ENCRYPTION"
     rotation_period = "7776000s"

@@ -12,6 +12,7 @@ environments/staging/
 ├── cloud-nat/  firewall/
 ├── service-accounts/  iam/      # SA identities, then role bindings
 ├── kms/                         # KeyRing + one CMEK key per consumer
+├── secret-manager/              # Secret containers (values added out-of-band) + per-secret IAM
 ├── kubernetes-engine/           # GKE cluster (hades) + node pools
 ├── cloud-sql-postgres-app/      # Cloud SQL PostgreSQL
 ├── artifact-registry/
@@ -38,11 +39,12 @@ A workspace only works once its dependencies exist in GCP:
 |---|---|---|
 | `services` | — | Apply first |
 | `service-accounts` | `services` | Before `iam` |
-| `iam` | `service-accounts` | SA must exist |
+| `iam` | `service-accounts`, `secret-manager` | SA + secret `iam-memberships` must exist |
 | `kms` | `services` | Before every CMEK consumer |
+| `secret-manager` | `services`, `kms` | Key `secret-manager`; add secret values before `iam` / `kubernetes-engine` |
 | `vpc` | `services` | Network + PSA |
 | `cloud-nat`, `firewall` | `vpc` | |
-| `kubernetes-engine` | `vpc`, `kms` | Key `gke` |
+| `kubernetes-engine` | `vpc`, `kms`, `secret-manager` | Key `gke`, secret `gke-admin-networks` |
 | `cloud-sql-postgres-app` | `vpc`, `kms` | Key `cloud-sql` — **CMEK is create-time only** |
 | `artifact-registry` | `services`, `kms` | Key `artifact-registry` |
 | `backup-for-gke` | `kubernetes-engine`, `kms` | `enable_gke_backup_agent = true`, key `backup-gke` |
@@ -62,7 +64,7 @@ gcloud config set project <your-gcp-project-id>
 export TF_VAR_project_id="$(gcloud config get-value project)"
 
 # KMS service agents must exist before the kms workspace applies
-for s in sqladmin artifactregistry gkebackup container; do
+for s in sqladmin artifactregistry gkebackup container secretmanager; do
   gcloud beta services identity create --service=$s.googleapis.com --project="$(gcloud config get-value project)"
 done
 ```
@@ -71,19 +73,19 @@ State bucket: create it with `bootstrap/<env>/` — steps in `bootstrap/staging/
 
 ### Private inputs (Secret Manager)
 
-Personal data stays out of Git. Create these once per env (after `services` enabled the Secret Manager API):
+Personal data and credentials stay out of Git. The `secret-manager` workspace creates the containers (CMEK, per-secret IAM); a human adds the values:
 
-| Secret | Read by | Value (JSON) |
+| Secret | Read by | Value |
 |---|---|---|
 | `staging-iam-memberships` | `iam` | `{"you@example.com": ["engineer"]}` |
 | `staging-gke-admin-networks` | `kubernetes-engine` | `[{"cidr_block": "203.0.113.10/32", "display_name": "admin"}]` |
+| `staging-atlantis-hostname` | `argocd-bootstrap` | public hostname of Atlantis |
+| `staging-atlantis-gh-app-id`, `-gh-app-key`, `-gh-webhook-secret`, `-web-password` | Atlantis (KSA `atlantis/atlantis-secrets`) | GitHub App ID, private key (PEM), webhook secret, web UI password |
 
 ```bash
-for s in staging-iam-memberships staging-gke-admin-networks; do
-  gcloud secrets create "$s" --replication-policy=user-managed --locations=asia-southeast2
-done
 printf '%s' '{"you@example.com":["engineer"]}' | gcloud secrets versions add staging-iam-memberships --data-file=-
 printf '%s' '[{"cidr_block":"203.0.113.10/32","display_name":"admin"}]' | gcloud secrets versions add staging-gke-admin-networks --data-file=-
+gcloud secrets versions add staging-atlantis-gh-app-key --data-file=app-private-key.pem   # then delete the local file
 ```
 
 ## 💻 Daily workflow
