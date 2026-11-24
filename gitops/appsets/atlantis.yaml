@@ -36,7 +36,6 @@ spec:
             valueFiles:
               - $values/gitops/atlantis/values.yaml
             valuesObject:
-              atlantisUrl: 'https://{{ index .metadata.annotations "platform/public-hostname" }}'
               githubApp:
                 id: '{{ index .metadata.annotations "platform/atlantis-gh-app-id" }}'
                 slug: '{{ index .metadata.annotations "platform/atlantis-gh-app-slug" }}'
