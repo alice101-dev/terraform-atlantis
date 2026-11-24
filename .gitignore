@@ -78,6 +78,10 @@ terraform.rc
 secrets.yaml
 secrets.yml
 secrets.json
+# Manifest Kubernetes di gitops/ tidak pernah berisi nilai rahasia (nilai
+# datang dari ExternalSecret), jadi pola di atas tidak berlaku di sana.
+!gitops/**/secrets.yaml
+!gitops/**/secrets.yml
 .secrets
 .env
 .env.*
