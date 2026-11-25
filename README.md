@@ -135,6 +135,14 @@ Applying: workspaces in `atlantis.yaml` are applied **only through a PR** (see *
 gh api -X PUT repos/alice101-dev/terraform-atlantis/branches/main/protection --input .github/branch-protection.json
 ```
 
+The file is tuned for a single maintainer: with `enforce_admins: true` nobody can approve their own PR, so any required approval would block every merge. When a second maintainer joins, change:
+
+| Setting | Single maintainer (current) | Team |
+|---|---|---|
+| `required_approving_review_count` | `0` | `1` |
+| `require_code_owner_reviews` | `false` | `true` (add `.github/CODEOWNERS` first) |
+| `require_last_push_approval` | `false` | `true` |
+
 Interaction limits restrict comments and PRs to collaborators; they expire every 6 months, renew with:
 
 ```bash
