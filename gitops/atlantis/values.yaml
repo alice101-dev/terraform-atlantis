@@ -36,6 +36,12 @@ environment:
   ATLANTIS_ENABLE_POLICY_CHECKS: "true"
   ATLANTIS_AUTODISCOVER_MODE: disabled
   ATLANTIS_SILENCE_FORK_PR_ERRORS: "true"
+  # Automerge pakai squash agar kompatibel dengan required_linear_history.
+  ATLANTIS_AUTOMERGE_METHOD: squash
+  # Cek mergeable mengabaikan status atlantis/apply; tanpa ini, menjadikan
+  # atlantis/apply required check membuat apply deadlock (apply butuh
+  # mergeable, mergeable butuh status apply).
+  ATLANTIS_GH_ALLOW_MERGEABLE_BYPASS_APPLY: "true"
   CHECKPOINT_DISABLE: "1" # tanpa panggilan checkpoint-api HashiCorp (egress dibatasi)
   # Pakai conftest bawaan image (/usr/local/bin). Image mengisi
   # DEFAULT_CONFTEST_VERSION sehingga Atlantis mengunduh conftest dari GitHub
