@@ -145,6 +145,13 @@ The file is tuned for a single maintainer with Atlantis not always running. With
 | `required_linear_history` | `false` | `true` | `ATLANTIS_AUTOMERGE_METHOD: squash` (set) |
 | `required_status_checks.checks` | CI jobs | CI jobs + `atlantis/plan`, `atlantis/apply` | Atlantis running; `ATLANTIS_GH_ALLOW_MERGEABLE_BYPASS_APPLY: "true"` (set) |
 
+Notes on the Atlantis checks:
+
+- `atlantis/apply` keeps `main` equal to what is applied: without it a PR can be merged from the UI before `atlantis apply` runs. `automerge` only covers merges done by Atlantis itself.
+- Without the bypass flag the two requirements deadlock: apply needs a mergeable PR, and the PR is only mergeable once `atlantis/apply` has succeeded.
+- Before enabling them, check that a new PR gets `atlantis/plan`, `atlantis/policy_check` and `atlantis/apply` statuses (a PR with no Atlantis project gets `0/0 ... successfully`).
+- Without `app_id`, any actor that can write commit statuses can post `atlantis/apply: success`. Pinning `"app_id": <Atlantis GitHub App ID>` closes that, but puts the App ID in this public repo (otherwise it is read from Secret Manager by `argocd-bootstrap`).
+
 Interaction limits restrict comments and PRs to collaborators; they expire every 6 months, renew with:
 
 ```bash
