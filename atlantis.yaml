@@ -10,8 +10,14 @@ version: 3
 automerge: true
 parallel_plan: false
 parallel_apply: false
+# Urutan antar project mengikuti dependensi data source by-name: grup dengan
+# angka kecil jalan dulu, dan grup yang gagal membatalkan grup berikutnya.
+# depends_on: apply ditolak selama dependensi yang ikut berubah di PR yang sama
+# belum di-apply (plan "no changes" dianggap terpenuhi).
+abort_on_execution_order_fail: true
 projects:
   - name: staging-services
+    execution_order_group: 1
     dir: environments/staging/services
     autoplan:
       enabled: true
@@ -21,6 +27,8 @@ projects:
         - ".terraform.lock.hcl"
         - "../../../modules/services/*.tf"
   - name: staging-vpc
+    execution_order_group: 2
+    depends_on: [staging-services]
     dir: environments/staging/vpc
     autoplan:
       enabled: true
@@ -30,6 +38,8 @@ projects:
         - ".terraform.lock.hcl"
         - "../../../modules/vpc/*.tf"
   - name: staging-cloud-nat
+    execution_order_group: 3
+    depends_on: [staging-vpc]
     dir: environments/staging/cloud-nat
     autoplan:
       enabled: true
@@ -39,6 +49,8 @@ projects:
         - ".terraform.lock.hcl"
         - "../../../modules/cloud-nat/*.tf"
   - name: staging-firewall
+    execution_order_group: 3
+    depends_on: [staging-vpc]
     dir: environments/staging/firewall
     autoplan:
       enabled: true
@@ -48,6 +60,8 @@ projects:
         - ".terraform.lock.hcl"
         - "../../../modules/firewall/*.tf"
   - name: staging-static-ip
+    execution_order_group: 2
+    depends_on: [staging-services]
     dir: environments/staging/static-ip
     autoplan:
       enabled: true
@@ -57,6 +71,8 @@ projects:
         - ".terraform.lock.hcl"
         - "../../../modules/static-ip/*.tf"
   - name: staging-kms
+    execution_order_group: 2
+    depends_on: [staging-services]
     dir: environments/staging/kms
     autoplan:
       enabled: true
@@ -66,6 +82,8 @@ projects:
         - ".terraform.lock.hcl"
         - "../../../modules/kms/*.tf"
   - name: staging-secret-manager
+    execution_order_group: 3
+    depends_on: [staging-kms]
     dir: environments/staging/secret-manager
     autoplan:
       enabled: true
@@ -75,6 +93,8 @@ projects:
         - ".terraform.lock.hcl"
         - "../../../modules/secret-manager/*.tf"
   - name: staging-cloud-sql-postgres-app
+    execution_order_group: 3
+    depends_on: [staging-vpc, staging-kms]
     dir: environments/staging/cloud-sql-postgres-app
     autoplan:
       enabled: true
@@ -84,6 +104,8 @@ projects:
         - ".terraform.lock.hcl"
         - "../../../modules/cloud-sql/*.tf"
   - name: staging-artifact-registry
+    execution_order_group: 3
+    depends_on: [staging-kms]
     dir: environments/staging/artifact-registry
     autoplan:
       enabled: true
@@ -93,6 +115,8 @@ projects:
         - ".terraform.lock.hcl"
         - "../../../modules/artifact-registry/*.tf"
   - name: staging-backup-for-gke
+    execution_order_group: 3
+    depends_on: [staging-kms]
     dir: environments/staging/backup-for-gke
     autoplan:
       enabled: true
@@ -102,6 +126,8 @@ projects:
         - ".terraform.lock.hcl"
         - "../../../modules/backup-for-gke/*.tf"
   - name: staging-cloud-storage
+    execution_order_group: 3
+    depends_on: [staging-kms]
     dir: environments/staging/cloud-storage
     autoplan:
       enabled: true
