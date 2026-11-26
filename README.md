@@ -135,13 +135,15 @@ Applying: workspaces in `atlantis.yaml` are applied **only through a PR** (see *
 gh api -X PUT repos/alice101-dev/terraform-atlantis/branches/main/protection --input .github/branch-protection.json
 ```
 
-The file is tuned for a single maintainer: with `enforce_admins: true` nobody can approve their own PR, so any required approval would block every merge. When a second maintainer joins, change:
+The file is tuned for a single maintainer with Atlantis not always running. With `enforce_admins: true` nobody can approve their own PR, so a required approval would block every merge. A required Atlantis check would also block every PR whenever Atlantis is down, including a PR that fixes Atlantis. For production, change:
 
-| Setting | Single maintainer (current) | Team |
-|---|---|---|
-| `required_approving_review_count` | `0` | `1` |
-| `require_code_owner_reviews` | `false` | `true` (add `.github/CODEOWNERS` first) |
-| `require_last_push_approval` | `false` | `true` |
+| Setting | Current | Production | Prerequisite |
+|---|---|---|---|
+| `required_approving_review_count` | `0` | `1` | a second maintainer |
+| `require_code_owner_reviews` | `false` | `true` | `.github/CODEOWNERS` |
+| `require_last_push_approval` | `false` | `true` | a second maintainer |
+| `required_linear_history` | `false` | `true` | `ATLANTIS_AUTOMERGE_METHOD: squash` (set) |
+| `required_status_checks.checks` | CI jobs | CI jobs + `atlantis/plan`, `atlantis/apply` | Atlantis running; `ATLANTIS_GH_ALLOW_MERGEABLE_BYPASS_APPLY: "true"` (set) |
 
 Interaction limits restrict comments and PRs to collaborators; they expire every 6 months, renew with:
 
