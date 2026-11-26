@@ -143,6 +143,7 @@ The file is tuned for a single maintainer with Atlantis not always running. With
 | `require_code_owner_reviews` | `false` | `true` | `.github/CODEOWNERS` |
 | `require_last_push_approval` | `false` | `true` | a second maintainer |
 | `apply_requirements` (`gitops/atlantis/values.yaml`) | `[mergeable, undiverged]` | `[approved, mergeable, undiverged]` | a second maintainer |
+| `policies.policy_sets[].prevent_self_approve` (`gitops/atlantis/values.yaml`) | `false` (default) | `true` | a second policy owner |
 | `required_linear_history` | `false` | `true` | `ATLANTIS_AUTOMERGE_METHOD: squash` (set) |
 | `required_status_checks.checks` | CI jobs | CI jobs + `atlantis/plan`, `atlantis/apply` | Atlantis running; `ATLANTIS_GH_ALLOW_MERGEABLE_BYPASS_APPLY: "true"` (set) |
 
@@ -152,7 +153,9 @@ Notes on the Atlantis settings:
 - Without the bypass flag the two requirements deadlock: apply needs a mergeable PR, and the PR is only mergeable once `atlantis/apply` has succeeded.
 - Before enabling them, check that a new PR gets `atlantis/plan`, `atlantis/policy_check` and `atlantis/apply` statuses (a PR with no Atlantis project gets `0/0 ... successfully`).
 - Without `app_id`, any actor that can write commit statuses can post `atlantis/apply: success`. Pinning `"app_id": <Atlantis GitHub App ID>` closes that, but puts the App ID in this public repo (otherwise it is read from Secret Manager by `argocd-bootstrap`).
-- `apply_requirements` stays in the server-side `repoConfig`, never in `atlantis.yaml`: Atlantis reads `atlantis.yaml` from the PR branch, so its author could drop a requirement, and `allowed_overrides: []` rejects the key there anyway. `approved` keeps apply gated on a review even if branch protection is relaxed.
+- `prevent_self_approve: true` stops a PR author from running `approve_policies` on their own PR; it must stay `false` while the only policy owner is also the only author.
+- Apply is restricted by a username check in the `guarded` workflow; with a team, move this to `team_authz`.
+- `apply_requirements` stays in the server-side `repoConfig`, never in `atlantis.yaml`: Atlantis reads `atlantis.yaml` from the PR branch, so its author could drop a requirement, and `allowed_overrides: []` rejects the key there anyway. `approved` alone is weak on a public repo: any user with read access can approve, which is everyone once interaction limits expire. The real review gate is `mergeable` plus the required review in branch protection, which only counts reviewers with write access.
 
 Interaction limits restrict comments and PRs to collaborators; they expire every 6 months, renew with:
 
@@ -249,7 +252,8 @@ Atlantis can change real infrastructure, so it is locked down layer by layer —
 | Repo allowlist = this repo only; fork PRs disabled; `apply all` disabled; webhook secret required | `gitops/atlantis/values.yaml` |
 | Only PRs authored by `alice101-dev` are planned; only `alice101-dev` can apply | `repoConfig` workflow `guarded` (`PULL_AUTHOR` / `USER_NAME`) |
 | Apply requires `mergeable` (CI green, branch protection) + `undiverged`; a new plan discards approvals | `repoConfig`, `ATLANTIS_DISCARD_APPROVAL_ON_PLAN` |
-| Workflow, requirements and policies can't be overridden from a PR | `allowed_overrides: []`, `allow_custom_workflows: false` |
+| Only `version`, `plan`, `apply`, `unlock`, `approve_policies`, `cancel` commands; `import` and `state rm` are disabled because the `guarded` workflow has no `import`/`state_rm` stages (the defaults would skip the user check and output redaction) | `ATLANTIS_ALLOW_COMMANDS` |
+| Workflow, requirements, policies and autodiscover can't be overridden from a PR | `allowed_overrides: []`, `allow_custom_workflows: false`, `autodiscover: disabled` in `repoConfig` |
 | conftest `guardrails`: delete/replace of stateful resources, lowering deletion protection (`true` → `false`, `PREVENT` → `DELETE`), project IAM, resource-level IAM (`*_iam_member`/`_binding`/`_policy`), service accounts, `0.0.0.0/0` firewalls need `atlantis approve_policies` from a policy owner | `gitops/atlantis/config/files/policies/guardrails.rego` |
 | Plan/apply output in the public PR has the project ID / number redacted; links point to `localhost` | `repoConfig` (`run` + `sed`), `atlantisUrl` |
 
