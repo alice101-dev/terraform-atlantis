@@ -167,6 +167,12 @@ Interaction limits restrict comments and PRs to collaborators; they expire every
 gh api -X PUT repos/alice101-dev/terraform-atlantis/interaction-limits -f limit=collaborators_only -f expiry=six_months
 ```
 
+Head branches are deleted automatically after merge, whether the PR is merged from the UI or by Atlantis `automerge` (Atlantis' own `delete_source_branch_on_merge` only covers its merges):
+
+```bash
+gh api -X PATCH repos/alice101-dev/terraform-atlantis -F delete_branch_on_merge=true
+```
+
 ## 🤖 Atlantis (plan/apply on PRs)
 
 Atlantis runs in GKE (`gitops/appsets/atlantis.yaml`) and manages only the projects listed in `atlantis.yaml`; `bootstrap`, `iam`, `service-accounts`, `kubernetes-engine`, `atlantis-identity` and `argocd-bootstrap` stay human-applied.
