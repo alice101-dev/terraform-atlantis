@@ -252,6 +252,7 @@ Atlantis can change real infrastructure, so it is locked down layer by layer —
 | Repo allowlist = this repo only; fork PRs disabled; `apply all` disabled; webhook secret required | `gitops/atlantis/values.yaml` |
 | Only PRs authored by `alice101-dev` are planned; only `alice101-dev` can apply | `repoConfig` workflow `guarded` (`PULL_AUTHOR` / `USER_NAME`) |
 | Apply requires `mergeable` (CI green, branch protection) + `undiverged`; a new plan discards approvals | `repoConfig`, `ATLANTIS_DISCARD_APPROVAL_ON_PLAN` |
+| Only `version`, `plan`, `apply`, `unlock`, `approve_policies`, `cancel` commands; `import` and `state rm` are disabled because the `guarded` workflow has no `import`/`state_rm` stages (the defaults would skip the user check and output redaction) | `ATLANTIS_ALLOW_COMMANDS` |
 | Workflow, requirements, policies and autodiscover can't be overridden from a PR | `allowed_overrides: []`, `allow_custom_workflows: false`, `autodiscover: disabled` in `repoConfig` |
 | conftest `guardrails`: delete/replace of stateful resources, lowering deletion protection (`true` → `false`, `PREVENT` → `DELETE`), project IAM, resource-level IAM (`*_iam_member`/`_binding`/`_policy`), service accounts, `0.0.0.0/0` firewalls need `atlantis approve_policies` from a policy owner | `gitops/atlantis/config/files/policies/guardrails.rego` |
 | Plan/apply output in the public PR has the project ID / number redacted; links point to `localhost` | `repoConfig` (`run` + `sed`), `atlantisUrl` |

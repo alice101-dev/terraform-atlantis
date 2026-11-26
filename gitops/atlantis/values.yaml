@@ -36,6 +36,9 @@ environment:
   ATLANTIS_ENABLE_POLICY_CHECKS: "true"
   ATLANTIS_AUTODISCOVER_MODE: disabled
   ATLANTIS_SILENCE_FORK_PR_ERRORS: "true"
+  # Sama dengan default v0.50.0, ditulis eksplisit agar tidak ikut berubah
+  # saat upgrade. import & state sengaja tidak diizinkan (lihat workflow guarded).
+  ATLANTIS_ALLOW_COMMANDS: "version,plan,apply,unlock,approve_policies,cancel"
   # Automerge pakai squash agar kompatibel dengan required_linear_history.
   ATLANTIS_AUTOMERGE_METHOD: squash
   # Cek mergeable mengabaikan status atlantis/apply; tanpa ini, menjadikan
@@ -73,6 +76,10 @@ repoConfig: |
         mode: on_plan
 
   workflows:
+    # guarded hanya punya stage plan, policy_check, apply. Stage import &
+    # state_rm tidak didefinisikan → Atlantis memakai langkah default tanpa cek
+    # user dan tanpa sensor output. Sebelum menambah import/state ke
+    # ATLANTIS_ALLOW_COMMANDS, tambahkan dulu kedua stage itu dengan guard yang sama.
     guarded:
       plan:
         steps:
