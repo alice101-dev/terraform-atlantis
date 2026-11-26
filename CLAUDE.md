@@ -40,7 +40,7 @@ terraform -chdir=modules/<name> init -backend=false && terraform -chdir=modules/
 checkov -d . --config-file .checkov.yaml --compact     # CI pins checkov==3.3.7
 ```
 
-CI (`.github/workflows/pr-checks.yml`, `secret-scan.yml`) runs fmt, validate, `terraform test`, Checkov, Trivy, TFLint, conftest and Gitleaks on every PR. **Atlantis** (in GKE, `gitops/atlantis/`) plans/applies the projects in `atlantis.yaml`; workflow, requirements and conftest policies are server-side (`gitops/atlantis/values.yaml`). A new Atlantis-managed workspace = add a project to `atlantis.yaml`; human-only workspaces never go there.
+CI (`.github/workflows/ci.yml`, `secret-scan.yml`) runs fmt, validate, `terraform test`, Checkov, Trivy, TFLint, conftest and Gitleaks on every PR. **Atlantis** (in GKE, `gitops/atlantis/`) plans/applies the projects in `atlantis.yaml`; workflow, requirements and conftest policies are server-side (`gitops/atlantis/values.yaml`). A new Atlantis-managed workspace = add a project to `atlantis.yaml`; human-only workspaces never go there.
 
 ## Conventions
 

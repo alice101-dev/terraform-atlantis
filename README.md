@@ -1,6 +1,6 @@
 # Hardened Atlantis on GKE — GitOps Terraform for GCP
 
-[![CI](https://github.com/alice101-dev/terraform-atlantis/actions/workflows/pr-checks.yml/badge.svg)](https://github.com/alice101-dev/terraform-atlantis/actions/workflows/pr-checks.yml)
+[![CI](https://github.com/alice101-dev/terraform-atlantis/actions/workflows/ci.yml/badge.svg)](https://github.com/alice101-dev/terraform-atlantis/actions/workflows/ci.yml)
 
 Terraform for GCP, planned and applied from pull requests by a **hardened Atlantis** running on GKE: deployed with Argo CD, reachable only through Cloudflare, guarded by policy checks, and running with least-privilege GCP access. See *🔐 Security*.
 
@@ -82,7 +82,7 @@ brew install tfenv && tfenv install && tfenv use
 # Checkov — same version as CI
 brew install pipx && pipx ensurepath && pipx install checkov==3.3.7
 
-# Trivy runs from the same image digest as CI (TRIVY_IMAGE in .github/workflows/pr-checks.yml), e.g.:
+# Trivy runs from the same image digest as CI (TRIVY_IMAGE in .github/workflows/ci.yml), e.g.:
 # docker run --rm --network none -v "$PWD:/src:ro" -w /src "$TRIVY_IMAGE" config --skip-check-update \
 #   --tf-vars environments/staging/vpc/staging.tfvars environments/staging/vpc
 

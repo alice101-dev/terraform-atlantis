@@ -1,4 +1,4 @@
-name: Terraform · PR Checks (offline)
+name: CI
 
 # Static & logic gates that run WITHOUT GCP credentials (everything offline /
 # mock). Stateful plan/apply with credentials is Atlantis' job, not this one.
@@ -16,7 +16,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: pr-checks-${{ github.ref }}
+  group: ci-${{ github.ref }}
   cancel-in-progress: true
 
 env:
