@@ -61,6 +61,11 @@ repoConfig: |
       allow_custom_workflows: false
       delete_source_branch_on_merge: true
       policy_check: true
+      # Autodiscover dimatikan juga di sini, bukan hanya lewat flag: menurut
+      # docs, key autodiscover di atlantis.yaml (dari branch PR) diabaikan bila
+      # diset di server-side repo config.
+      autodiscover:
+        mode: disabled
       # Lock project diambil saat plan dan dilepas saat PR merge/close/unlock:
       # plan yang di-review tetap valid sampai di-apply (nilai default, ditulis
       # eksplisit).
