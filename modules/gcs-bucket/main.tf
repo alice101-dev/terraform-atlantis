@@ -24,6 +24,7 @@ locals {
   ]...)
 }
 
+# trivy:ignore:GCP-0077 log akses bucket butuh bucket log terpisah; audit via Cloud Audit Logs, sama dengan checkov:skip=CKV_GCP_62
 resource "google_storage_bucket" "this" {
   # checkov:skip=CKV_GCP_62: log akses bucket butuh bucket log terpisah; audit akses via Cloud Audit Logs (Data Access) di level project
   for_each = var.buckets

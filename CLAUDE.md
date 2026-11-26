@@ -40,7 +40,7 @@ terraform -chdir=modules/<name> init -backend=false && terraform -chdir=modules/
 checkov -d . --config-file .checkov.yaml --compact     # CI pins checkov==3.3.7
 ```
 
-CI (`.github/workflows/pr-checks.yml`, `secret-scan.yml`) runs fmt, validate, `terraform test`, Checkov and Gitleaks on every PR. **Atlantis** (in GKE, `gitops/atlantis/`) plans/applies the projects in `atlantis.yaml`; workflow, requirements and conftest policies are server-side (`gitops/atlantis/values.yaml`). A new Atlantis-managed workspace = add a project to `atlantis.yaml`; human-only workspaces never go there.
+CI (`.github/workflows/ci.yml`, `secret-scan.yml`) runs fmt, validate, `terraform test`, Checkov, Trivy, TFLint, conftest and Gitleaks on every PR. **Atlantis** (in GKE, `gitops/atlantis/`) plans/applies the projects in `atlantis.yaml`; workflow, requirements and conftest policies are server-side (`gitops/atlantis/values.yaml`). A new Atlantis-managed workspace = add a project to `atlantis.yaml`; human-only workspaces never go there.
 
 ## Conventions
 
@@ -51,7 +51,7 @@ CI (`.github/workflows/pr-checks.yml`, `secret-scan.yml`) runs fmt, validate, `t
 5. **Variables** have `description` + `type`, `optional(...)` defaults, and `validation` for enums/ranges.
 6. Keep existing `lifecycle { ignore_changes = [...] }`; mark endpoints/certs/connection strings `sensitive = true`.
 7. **Comments in `.tf`/`.tftest.hcl` are short Bahasa Indonesia** (technical terms stay English).
-8. **Checkov must pass.** Harden the config instead of suppressing; skip only false-positives inline per-resource (`# checkov:skip=CKV_xxx: <why>`), never repo-wide. What Checkov can't resolve (tfvars-driven firewall/IAM) → `validation` + `terraform test`.
+8. **Checkov and Trivy must pass.** Harden the config instead of suppressing; skip only false-positives inline per-resource (`# checkov:skip=CKV_xxx: <why>`, `# trivy:ignore:GCP-xxxx <why>` on the line above the `resource`), never repo-wide. Trivy may not resolve `dynamic` blocks or data-source values (e.g. Cloud SQL `database_flags`): guard those with `terraform test`. What Checkov can't resolve (tfvars-driven firewall/IAM) → `validation` + `terraform test`.
 9. **Module logic change ⇒ update its test** (`run`/`assert`; each `validation`/`precondition` gets an `expect_failures` run).
 
 ## Verify schemas with the Terraform MCP — don't guess

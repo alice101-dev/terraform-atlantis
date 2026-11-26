@@ -1,6 +1,6 @@
 # Hardened Atlantis on GKE — GitOps Terraform for GCP
 
-[![CI](https://github.com/alice101-dev/terraform-atlantis/actions/workflows/pr-checks.yml/badge.svg)](https://github.com/alice101-dev/terraform-atlantis/actions/workflows/pr-checks.yml)
+[![CI](https://github.com/alice101-dev/terraform-atlantis/actions/workflows/ci.yml/badge.svg)](https://github.com/alice101-dev/terraform-atlantis/actions/workflows/ci.yml)
 
 Terraform for GCP, planned and applied from pull requests by a **hardened Atlantis** running on GKE: deployed with Argo CD, reachable only through Cloudflare, guarded by policy checks, and running with least-privilege GCP access. See *🔐 Security*.
 
@@ -82,6 +82,10 @@ brew install tfenv && tfenv install && tfenv use
 # Checkov — same version as CI
 brew install pipx && pipx ensurepath && pipx install checkov==3.3.7
 
+# Trivy runs from the same image digest as CI (TRIVY_IMAGE in .github/workflows/ci.yml), e.g.:
+# docker run --rm --network none -v "$PWD:/src:ro" -w /src "$TRIVY_IMAGE" config --skip-check-update \
+#   --tf-vars environments/staging/vpc/staging.tfvars environments/staging/vpc
+
 # GCP auth + project (the project ID is never committed — Terraform reads TF_VAR_project_id)
 gcloud auth login && gcloud auth application-default login
 gcloud config set project <your-gcp-project-id>
@@ -129,7 +133,7 @@ Applying: workspaces in `atlantis.yaml` are applied **only through a PR** (see *
 
 ### Repository settings
 
-`main` is protected by `.github/branch-protection.json`: PR required (admins included), branch must be up to date, no force push or deletion, and every CI job must pass — Format, Validate, Unit tests, Checkov, TFLint, Policy tests, Gitleaks. Every job runs on every PR, also one that touches no Terraform files: GitHub counts a job skipped via `if` as passing, so skipping would let a PR merge without the check having run. Apply after editing the file:
+`main` is protected by `.github/branch-protection.json`: PR required (admins included), branch must be up to date, no force push or deletion, and every CI job must pass — Format, Validate, Unit tests, Checkov, Trivy, TFLint, Policy tests, Gitleaks. Every job runs on every PR, also one that touches no Terraform files: GitHub counts a job skipped via `if` as passing, so skipping would let a PR merge without the check having run. Apply after editing the file:
 
 ```bash
 gh api -X PUT repos/alice101-dev/terraform-atlantis/branches/main/protection --input .github/branch-protection.json
@@ -265,7 +269,7 @@ Atlantis can change real infrastructure, so it is locked down layer by layer —
 | Workspaces needing IAM admin (`iam`, `service-accounts`, `kubernetes-engine`, `argocd-bootstrap`, `bootstrap`) stay human-applied | `atlantis.yaml` |
 | Secret Manager with CMEK and per-secret IAM to the consuming KSA only | `environments/staging/secret-manager` |
 | `deletion_protection` → native protection / `deletion_policy = PREVENT` (`true` in production) | each workspace `.tfvars` |
-| Branch protection + required checks; interaction limits (collaborators only); GitHub Actions pinned by commit SHA; Gitleaks, Checkov, TFLint, conftest tests in CI | `.github/` |
+| Branch protection + required checks; interaction limits (collaborators only); GitHub Actions pinned by commit SHA; Gitleaks, Checkov, Trivy (image pinned by digest, offline), TFLint, conftest tests in CI | `.github/` |
 | No project IDs, emails, admin IPs or hostnames in Git — per-env values come from Secret Manager and cluster-secret annotations | `argocd-bootstrap` |
 
 ## 📖 Cheat sheet

@@ -1,4 +1,4 @@
-name: Terraform · PR Checks (offline)
+name: CI
 
 # Static & logic gates that run WITHOUT GCP credentials (everything offline /
 # mock). Stateful plan/apply with credentials is Atlantis' job, not this one.
@@ -16,7 +16,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: pr-checks-${{ github.ref }}
+  group: ci-${{ github.ref }}
   cancel-in-progress: true
 
 env:
@@ -160,6 +160,54 @@ jobs:
           line="$(grep -aE 'Passed checks:' /tmp/ckv.txt | head -1 | sed -E 's/\x1b\[[0-9;]*m//g; s/^[[:space:]]+//')"
           { echo "### Checkov"; echo; echo "${line:-n/a}"; } >> "$GITHUB_STEP_SUMMARY"
           exit $code
+
+  # === Security scan: Trivy misconfiguration (successor of tfsec) ===
+  trivy:
+    name: Security scan (Trivy)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      # Official image pinned by digest. Not trivy-action / setup-trivy: their
+      # tags were hijacked in March 2026 (GHSA-69fq-xp46-6x23). Checks come from
+      # the bundle embedded in the image (--skip-check-update, --network none),
+      # so a run never downloads code or rules.
+      TRIVY_IMAGE: ghcr.io/aquasecurity/trivy:0.76.2@sha256:8f6bb947dbc528902e11f2f5be52f7b519f6a39d5d148f41166f2040499768fb
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Scan workspaces (with tfvars), unused modules and gitops (trivy config)
+        run: |
+          set +e # keep going so every target gets a row in the summary
+          scan() {
+            docker run --rm --network none -v "$PWD:/src:ro" -w /src "$TRIVY_IMAGE" \
+              config --skip-check-update --quiet --exit-code 1 "$@"
+          }
+          fail=0
+          row() { if [ "$2" = 0 ]; then echo "| \`$1\` | pass |"; else echo "| \`$1\` | **fail** |"; fi >> /tmp/trivy.md; }
+          # Each workspace with its <env>.tfvars: without it for_each maps are
+          # empty and resources are invisible to the scanner.
+          for ws in $(find environments bootstrap -name '*.tf' -printf '%h\n' | sort -u); do
+            env="$(echo "$ws" | cut -d/ -f2)"; args=()
+            [ -f "$ws/$env.tfvars" ] && args=(--tf-vars "$ws/$env.tfvars")
+            echo "::group::$ws"
+            scan --misconfig-scanners terraform "${args[@]}" "$ws"; rc=$?; [ $rc = 0 ] || fail=1
+            echo "::endgroup::"; row "$ws" $rc
+          done
+          # Modules no workspace calls are not reached above; scan them directly.
+          for m in modules/*/; do
+            m="${m%/}"
+            grep -rqs "$m\"" environments bootstrap && continue
+            echo "::group::$m"
+            scan --misconfig-scanners terraform "$m"; rc=$?; [ $rc = 0 ] || fail=1
+            echo "::endgroup::"; row "$m" $rc
+          done
+          echo "::group::gitops"
+          scan gitops; rc=$?; [ $rc = 0 ] || fail=1
+          echo "::endgroup::"; row gitops $rc
+          { echo "### Trivy config"; echo; echo "| Target | Result |"; echo "|---|---|"; cat /tmp/trivy.md; } >> "$GITHUB_STEP_SUMMARY"
+          exit $fail
 
   # === Policy tests: conftest unit tests for the Atlantis plan guardrails ===
   policy-tests:

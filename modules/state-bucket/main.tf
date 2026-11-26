@@ -18,6 +18,8 @@
 # lifecycle cleanup versi non-current (kontrol biaya storage).
 # ---------------------------------------------------------------------------
 
+# trivy:ignore:GCP-0077 bucket log akses butuh bucket lain (rekursi di bootstrap), sama dengan checkov:skip=CKV_GCP_62
+# trivy:ignore:GCP-0066 bucket state dibuat di layer bootstrap sebelum KMS ada; enkripsi Google-managed
 resource "google_storage_bucket" "state" {
   # checkov:skip=CKV_GCP_62: bucket log akses butuh bucket lain → rekursi di layer bootstrap; audit akses via Cloud Audit Logs (Data Access) di level project
 

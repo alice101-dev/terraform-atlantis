@@ -7,6 +7,8 @@ resource "google_compute_network" "vpc" {
 }
 
 # Hasilnya akan menjadi: prod-vpc-jakarta-[subnet-key]-subnet
+# trivy:ignore:GCP-0029 VPC Flow Logs per-subnet ditunda (biaya), sama dengan checkov:skip=CKV_GCP_26
+# trivy:ignore:GCP-0076 idem GCP-0029
 resource "google_compute_subnetwork" "subnet" {
   for_each = var.subnets
   # checkov:skip=CKV_GCP_74: private_ip_google_access default true, tapi for_each var.subnets tak teresolusi checkov statis
