@@ -61,6 +61,11 @@ repoConfig: |
       allow_custom_workflows: false
       delete_source_branch_on_merge: true
       policy_check: true
+      # Lock project diambil saat plan dan dilepas saat PR merge/close/unlock:
+      # plan yang di-review tetap valid sampai di-apply (nilai default, ditulis
+      # eksplisit).
+      repo_locks:
+        mode: on_plan
 
   workflows:
     guarded:
