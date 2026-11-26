@@ -6,7 +6,7 @@
 #   - PSC vs PSA (private_network, psc_config, PSC endpoint)
 #   - record_client_address dipaksa false saat PSC
 #   - deletion_protection -> instance + settings
-#   - engine-aware: MySQL menonaktifkan PITR
+#   - engine-aware: MySQL menonaktifkan PITR; flag logging compliance hanya Postgres
 #   - precondition PSC butuh subnetwork_id
 #   - validation block (edition, availability_type)
 # Jalankan: terraform -chdir=modules/cloud-sql test
@@ -139,6 +139,47 @@ run "mysql_disables_pitr" {
   assert {
     condition     = google_sql_database_instance.instance.settings[0].backup_configuration[0].point_in_time_recovery_enabled == false
     error_message = "MySQL: PITR harus false (MySQL memakai binary_log, bukan PITR)."
+  }
+}
+
+# --- Postgres: flag logging compliance terpasang; var.database_flags boleh menimpa ---
+run "postgres_sets_compliance_log_flags" {
+  command = plan
+
+  variables {
+    connectivity   = "PSA"
+    database_flags = { log_temp_files = "1024", timezone = "Etc/UTC" }
+  }
+
+  assert {
+    condition = alltrue([
+      for f in ["log_checkpoints=on", "log_connections=on", "log_disconnections=on", "log_lock_waits=on", "log_statement_stats=off"] :
+      contains([for d in google_sql_database_instance.instance.settings[0].database_flags : "${d.name}=${d.value}"], f)
+    ])
+    error_message = "Postgres: flag logging compliance (log_checkpoints/connections/disconnections/lock_waits, stats off) harus terpasang."
+  }
+  assert {
+    condition     = contains([for d in google_sql_database_instance.instance.settings[0].database_flags : "${d.name}=${d.value}"], "log_temp_files=1024")
+    error_message = "var.database_flags harus bisa menimpa default compliance (log_temp_files)."
+  }
+  assert {
+    condition     = contains([for d in google_sql_database_instance.instance.settings[0].database_flags : "${d.name}=${d.value}"], "timezone=Etc/UTC")
+    error_message = "Flag tambahan dari var.database_flags harus ikut terpasang."
+  }
+}
+
+# --- MySQL: flag compliance Postgres tidak dipasang (MySQL menolaknya) ---
+run "mysql_skips_postgres_log_flags" {
+  command = plan
+
+  variables {
+    database_version = "MYSQL_8_0"
+    connectivity     = "PSA"
+  }
+
+  assert {
+    condition     = length(google_sql_database_instance.instance.settings[0].database_flags) == 0
+    error_message = "MySQL: flag logging khusus Postgres tidak boleh dipasang."
   }
 }
 

@@ -17,6 +17,7 @@ resource "google_project_iam_member" "gke_sa_roles" {
 # ==============================================================================
 # 2. GKE CLUSTER (Regional Control Plane & Network Core)
 # ==============================================================================
+# trivy:ignore:GCP-0061 allowlist selalu terisi (tfvars + data source Secret Manager), tapi data source tak teresolusi scan statis
 resource "google_container_cluster" "primary" {
   # Banyak kontrol di-set via variabel / Dataplane V2 → checkov tak teresolusi statis.
   # Yang krusial (private nodes, shielded, workload identity, release channel, dll) dijaga

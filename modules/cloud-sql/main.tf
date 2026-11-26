@@ -27,13 +27,19 @@ locals {
   # Project yang boleh membuat PSC endpoint. Default ke project instance sendiri.
   psc_allowed_projects = length(var.allowed_consumer_projects) > 0 ? var.allowed_consumer_projects : [var.project_id]
 
-  # Flag stats-logging PostgreSQL (CKV2_GCP_14-17) — default-nya memang 'off',
-  # di-set eksplisit untuk compliance. Hanya Postgres (MySQL menolak flag ini).
+  # Flag logging PostgreSQL untuk compliance. Hanya Postgres (MySQL menolak flag ini).
+  # - stats-logging 'off' (CKV2_GCP_14-17): default-nya memang 'off', di-set eksplisit.
+  # - log koneksi/lock/checkpoint/temp file 'on' (Trivy GCP-0014/0016/0020/0022/0025).
   pg_compliance_flags = local.is_mysql ? {} : {
     log_executor_stats  = "off"
     log_parser_stats    = "off"
     log_planner_stats   = "off"
     log_statement_stats = "off"
+    log_checkpoints     = "on"
+    log_connections     = "on"
+    log_disconnections  = "on"
+    log_lock_waits      = "on"
+    log_temp_files      = "0" # 0 = log semua temp file
   }
 
   # Gabung: nilai dari var.database_flags bisa menimpa default compliance.
@@ -41,6 +47,13 @@ locals {
 }
 
 # 1. Cloud SQL instance
+# Flag logging (local.pg_compliance_flags) dipasang via dynamic block yang tak dievaluasi
+# Trivy; nilainya dijaga tests/logic.tftest.hcl (postgres_sets_compliance_log_flags).
+# trivy:ignore:GCP-0014 log_temp_files=0 via pg_compliance_flags (dynamic block)
+# trivy:ignore:GCP-0016 log_connections=on via pg_compliance_flags (dynamic block)
+# trivy:ignore:GCP-0020 log_lock_waits=on via pg_compliance_flags (dynamic block)
+# trivy:ignore:GCP-0022 log_disconnections=on via pg_compliance_flags (dynamic block)
+# trivy:ignore:GCP-0025 log_checkpoints=on via pg_compliance_flags (dynamic block)
 resource "google_sql_database_instance" "instance" {
   # Konektivitas PSC (jaringan privat) + banyak setting via variabel → checkov tak teresolusi statis.
   # checkov:skip=CKV_GCP_6: SSL diwajibkan via ssl_mode=ENCRYPTED_ONLY (default); CKV_GCP_6 masih memeriksa atribut require_ssl lama (deprecated)
