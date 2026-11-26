@@ -151,7 +151,7 @@ PR flow:
 2. Atlantis plans the changed projects and runs the conftest `guardrails` policy on the plan.
 3. If the policy fails (delete of a stateful resource, lowered deletion protection, project IAM, resource-level IAM, service account, open firewall), review it and comment `atlantis approve_policies -p staging-<service>`.
 4. When CI is green and the branch is up to date, comment `atlantis apply -p staging-<service>`.
-5. Atlantis merges the PR once every project is applied (`automerge: true`).
+5. Atlantis squash-merges the PR once every project is applied (`automerge: true`, `ATLANTIS_AUTOMERGE_METHOD: squash`).
 
 Security controls around Atlantis: see *🔐 Security*.
 
