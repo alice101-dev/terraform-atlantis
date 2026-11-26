@@ -3,12 +3,10 @@ name: Terraform · PR Checks (offline)
 # Static & logic gates that run WITHOUT GCP credentials (everything offline /
 # mock). Stateful plan/apply with credentials is Atlantis' job, not this one.
 #
-# The workflow runs on EVERY PR (no `paths:` filter) because its jobs are
-# required status checks. A `changes` job detects whether the PR touches
-# Terraform; when it doesn't, the Terraform jobs are skipped. A job skipped via
-# `if` reports "Success" and does not block a required check (GitHub docs,
-# "Using conditions to control job execution"). Results live in the Checks tab
-# and each job's run summary — no PR comment (Atlantis already comments).
+# Every job runs on every PR (no `paths:` filter, no `if:` skip): each job is a
+# required status check, and a job skipped via `if` reports "Success", which
+# would let a PR merge without the check having run. Results live in the Checks
+# tab and each job's run summary — no PR comment (Atlantis already comments).
 on:
   pull_request:
     branches: [main]
@@ -29,48 +27,9 @@ env:
   TFLINT_VERSION: "v0.59.1"
 
 jobs:
-  # === Changes: does this PR touch Terraform (or the tooling that checks it)? ===
-  changes:
-    name: Detect Terraform changes
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    outputs:
-      terraform: ${{ steps.diff.outputs.terraform }}
-      policy: ${{ steps.diff.outputs.policy }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0 # base and head commits are both needed for the diff
-          persist-credentials: false
-      - name: Diff against base
-        id: diff
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: |
-          files="$(git diff --name-only "$BASE_SHA...$HEAD_SHA")"
-          printf '%s\n' "$files"
-          pattern='(\.tf|\.tfvars|\.tftest\.hcl|\.terraform\.lock\.hcl)$|^\.terraform-version$|^\.tflint\.hcl$|^\.checkov\.yaml$|^\.github/workflows/pr-checks\.yml$'
-          if printf '%s\n' "$files" | grep -qE "$pattern"; then
-            echo "terraform=true" >> "$GITHUB_OUTPUT"
-            echo "Terraform changes detected — running all Terraform checks." >> "$GITHUB_STEP_SUMMARY"
-          else
-            echo "terraform=false" >> "$GITHUB_OUTPUT"
-            echo "No Terraform changes — Terraform checks skipped." >> "$GITHUB_STEP_SUMMARY"
-          fi
-          policy_pattern='^gitops/atlantis/config/(files/policies|policy-tests)/|^\.github/workflows/pr-checks\.yml$'
-          if printf '%s\n' "$files" | grep -qE "$policy_pattern"; then
-            echo "policy=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "policy=false" >> "$GITHUB_OUTPUT"
-          fi
-
   # === Format: terraform fmt across the whole repo ===
   format:
     name: Format
-    needs: changes
-    if: needs.changes.outputs.terraform == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -92,8 +51,6 @@ jobs:
   # === Validate: all workspaces in one job (loop), no backend/state ===
   validate:
     name: Validate (all workspaces)
-    needs: changes
-    if: needs.changes.outputs.terraform == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -135,8 +92,6 @@ jobs:
   # === Unit test: every module with tests (plan + mock_provider, offline) ===
   unit-test:
     name: Unit tests (terraform test)
-    needs: changes
-    if: needs.changes.outputs.terraform == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -184,8 +139,6 @@ jobs:
   # === Security scan: Checkov (curated policy in .checkov.yaml) ===
   security-scan:
     name: Security scan (Checkov)
-    needs: changes
-    if: needs.changes.outputs.terraform == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -211,8 +164,6 @@ jobs:
   # === Policy tests: conftest unit tests for the Atlantis plan guardrails ===
   policy-tests:
     name: Policy tests (conftest)
-    needs: changes
-    if: needs.changes.outputs.policy == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     env:
@@ -235,8 +186,6 @@ jobs:
   # === Lint: TFLint across all workspaces ===
   lint:
     name: Lint (TFLint, all workspaces)
-    needs: changes
-    if: needs.changes.outputs.terraform == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:

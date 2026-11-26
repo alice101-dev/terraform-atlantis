@@ -129,7 +129,7 @@ Applying: workspaces in `atlantis.yaml` are applied **only through a PR** (see *
 
 ### Repository settings
 
-`main` is protected by `.github/branch-protection.json`: PR required (admins included), branch must be up to date, no force push or deletion, and every CI job must pass — Detect Terraform changes, Format, Validate, Unit tests, Checkov, TFLint, Policy tests, Gitleaks. On a PR that touches no Terraform files the Terraform jobs are skipped, which counts as passing. Apply after editing the file:
+`main` is protected by `.github/branch-protection.json`: PR required (admins included), branch must be up to date, no force push or deletion, and every CI job must pass — Format, Validate, Unit tests, Checkov, TFLint, Policy tests, Gitleaks. Every job runs on every PR, also one that touches no Terraform files: GitHub counts a job skipped via `if` as passing, so skipping would let a PR merge without the check having run. Apply after editing the file:
 
 ```bash
 gh api -X PUT repos/alice101-dev/terraform-atlantis/branches/main/protection --input .github/branch-protection.json
