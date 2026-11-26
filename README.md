@@ -142,15 +142,17 @@ The file is tuned for a single maintainer with Atlantis not always running. With
 | `required_approving_review_count` | `0` | `1` | a second maintainer |
 | `require_code_owner_reviews` | `false` | `true` | `.github/CODEOWNERS` |
 | `require_last_push_approval` | `false` | `true` | a second maintainer |
+| `apply_requirements` (`gitops/atlantis/values.yaml`) | `[mergeable, undiverged]` | `[approved, mergeable, undiverged]` | a second maintainer |
 | `required_linear_history` | `false` | `true` | `ATLANTIS_AUTOMERGE_METHOD: squash` (set) |
 | `required_status_checks.checks` | CI jobs | CI jobs + `atlantis/plan`, `atlantis/apply` | Atlantis running; `ATLANTIS_GH_ALLOW_MERGEABLE_BYPASS_APPLY: "true"` (set) |
 
-Notes on the Atlantis checks:
+Notes on the Atlantis settings:
 
 - `atlantis/apply` keeps `main` equal to what is applied: without it a PR can be merged from the UI before `atlantis apply` runs. `automerge` only covers merges done by Atlantis itself.
 - Without the bypass flag the two requirements deadlock: apply needs a mergeable PR, and the PR is only mergeable once `atlantis/apply` has succeeded.
 - Before enabling them, check that a new PR gets `atlantis/plan`, `atlantis/policy_check` and `atlantis/apply` statuses (a PR with no Atlantis project gets `0/0 ... successfully`).
 - Without `app_id`, any actor that can write commit statuses can post `atlantis/apply: success`. Pinning `"app_id": <Atlantis GitHub App ID>` closes that, but puts the App ID in this public repo (otherwise it is read from Secret Manager by `argocd-bootstrap`).
+- `apply_requirements` stays in the server-side `repoConfig`, never in `atlantis.yaml`: Atlantis reads `atlantis.yaml` from the PR branch, so its author could drop a requirement, and `allowed_overrides: []` rejects the key there anyway. `approved` keeps apply gated on a review even if branch protection is relaxed.
 
 Interaction limits restrict comments and PRs to collaborators; they expire every 6 months, renew with:
 
